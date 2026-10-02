@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+:root {
+  --night: #001252;
+  --royal: #031aa3;
+  --bright: #0348d6;
+  --orange: #ee5e08;
+  --gold: #fe9c0c;
+  --sun: #ffb000;
+  --white: #ffffff;
+  --ink: #0b1638;
+  --muted: #4b5878;
+  --line: #d9e1f2;
+  --paper: #f5f7fc;
+  --soft: #eef2fb;
+}
+
+@theme inline {
+  --color-night: var(--night);
+  --color-royal: var(--royal);
+  --color-bright: var(--bright);
+  --color-orange: var(--orange);
+  --color-gold: var(--gold);
+  --color-sun: var(--sun);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-paper: var(--paper);
+  --color-soft: var(--soft);
+  --font-sans: var(--font-plus-jakarta);
+  --shadow-lift: 0 24px 60px rgba(0, 18, 82, 0.12);
+  --shadow-card: 0 16px 40px rgba(0, 18, 82, 0.08);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-plus-jakarta), "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #0348d6;
+  color: #fff;
+}
+
+*:focus-visible {
+  outline: 2px solid #0348d6;
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -40px;
+  z-index: 80;
+  border-radius: 999px;
+  background: #001252;
+  color: #fff;
+  padding: 0.5rem 1rem;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+.hero-grid {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 80% 20%, rgba(3, 72, 214, 0.35), transparent 60%),
+    radial-gradient(ellipse 50% 50% at 10% 80%, rgba(238, 94, 8, 0.18), transparent 55%),
+    linear-gradient(180deg, #001252 0%, #031aa3 100%);
+}
+
+.mesh {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.orange-underline {
+  background-image: linear-gradient(90deg, #ee5e08, #ffb000);
+  background-repeat: no-repeat;
+  background-position: 0 92%;
+  background-size: 100% 6px;
+}
+
+.journey-line {
+  background: linear-gradient(90deg, #031aa3, #0348d6 50%, #ee5e08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .motion-safe {
+    animation: none !important;
+    transition: none !important;
+  }
+}
