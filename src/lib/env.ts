@@ -16,7 +16,7 @@ import {
  * - Les valeurs secrètes ne sont jamais journalisées ni exposées.
  */
 
-export const DEFAULT_CONTACT_EMAIL = "bonjour@carriova.com";
+export const DEFAULT_CONTACT_EMAIL = "contact@carriovaci.com";
 export const MIN_ADMIN_TOKEN_LENGTH = 32;
 const DEFAULT_RESEND_BASE_URL = "https://api.resend.com";
 const DEFAULT_WHATSAPP_BASE_URL = "https://graph.facebook.com";
@@ -225,7 +225,7 @@ function loadServerEnv(): { env: ServerEnv; issues: EnvIssue[] } {
   // --- Mesure d’audience ------------------------------------------------------------
   const plausible = read("NEXT_PUBLIC_PLAUSIBLE_DOMAIN");
   if (plausible && !normalizePlausibleDomain(plausible)) {
-    fail("NEXT_PUBLIC_PLAUSIBLE_DOMAIN", "nom de domaine attendu (ex. carriova.com) : mesure désactivée.");
+    fail("NEXT_PUBLIC_PLAUSIBLE_DOMAIN", "nom de domaine attendu (ex. carriovaci.com) : mesure désactivée.");
   }
 
   return {
