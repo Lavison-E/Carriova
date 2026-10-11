@@ -46,9 +46,24 @@ Sous PowerShell, utilisez plutôt :
 Copy-Item .env.example .env
 ```
 
-Configurez au minimum `DATABASE_URL` avec l’URL de votre base PostgreSQL. Les autres intégrations sont facultatives et restent désactivées si elles ne sont pas configurées. Consultez les commentaires de [`.env.example`](.env.example) pour connaître chaque variable et les précautions associées.
+Configurez `DATABASE_URL` avec l’URL PostgreSQL pooled de Neon. Pour les opérations de schéma, ajoutez de préférence l’URL directe de Neon dans `DATABASE_URL_UNPOOLED`; à défaut, Drizzle réutilise `DATABASE_URL`. Gardez ces URL secrètes. Les autres intégrations sont facultatives et restent désactivées si elles ne sont pas configurées. Consultez les commentaires de [`.env.example`](.env.example) pour connaître chaque variable.
 
-> Le schéma de données est défini dans `src/db/schema.ts`. Aucune commande de migration ou de création du schéma n’est actuellement configurée dans le projet : la base doit donc déjà contenir les tables attendues avant d’utiliser les pages qui lisent ou écrivent des données.
+Le schéma est défini dans `src/db/schema.ts`. Pour créer les tables d’une base Neon vide avec une migration versionnée :
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+```
+
+La migration générée dans `drizzle/` doit être commitée avec le changement de schéma. Pour les évolutions suivantes, régénérez puis appliquez la migration :
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+`npm run db:push` applique directement le schéma sans créer de migration versionnée; réservez-le au prototypage et ne le mélangez pas avec l’historique des migrations d’une même base.
 
 Démarrez le serveur de développement :
 
@@ -84,7 +99,7 @@ Les paramètres requis, règles de validation et comportements lorsque ces varia
 
 ## Données et contenu
 
-Les tables PostgreSQL et leurs types sont déclarés dans `src/db/schema.ts`. Le script `scripts/seed.mjs` insère des exemples d’offres et d’articles; il suppose que le schéma correspondant existe déjà et ne crée pas les tables.
+Les tables PostgreSQL et leurs types sont déclarés dans `src/db/schema.ts`. La configuration Drizzle utilise `DATABASE_URL_UNPOOLED` lorsqu’elle est fournie, sinon `DATABASE_URL`.
 
 Les routes API principales sont :
 
