@@ -1,6 +1,6 @@
-import { LoginForm } from "@/components/forms/LeadForms";
+
 import { PageHero } from "@/components/layout/PageHero";
-import { Card, JsonLd, Section } from "@/components/ui/primitives";
+import { ButtonLink, Card, JsonLd, Section } from "@/components/ui/primitives";
 import { breadcrumbJsonLd, buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
@@ -21,17 +21,19 @@ export default function LoginPage() {
       <PageHero
         eyebrow="Compte"
         title="Se connecter à CARRIOVA."
-        text="Indiquez l’e-mail de votre compte. L’espace authentifié s’ouvrira progressivement pour vos documents et demandes."
+        text="Votre espace personnel est en préparation. En attendant, notre équipe peut vous accompagner pour votre CV, vos candidatures et votre projet professionnel."
         crumbs={crumbs}
       />
       <Section>
         <div className="mx-auto max-w-xl">
           <Card>
-            <LoginForm />
+            <h2 className="text-xl font-bold text-night">Besoin de retrouver une demande ?</h2>
+            <p className="mt-3 text-sm leading-6 text-muted">Contactez notre équipe avec l’adresse e-mail utilisée lors de votre inscription. Nous vous aiderons à faire le point sur votre accompagnement.</p>
+            <ButtonLink href="/contact" className="mt-5">Contacter l’équipe</ButtonLink>
             <p className="mt-4 text-sm text-muted">
               Pas encore de compte ?{" "}
               <a className="font-semibold text-bright" href="/compte/creer">
-                Créer mon compte
+                Préparer mon espace
               </a>
             </p>
           </Card>

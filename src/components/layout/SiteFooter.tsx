@@ -7,9 +7,9 @@ import { footerGroups, whatsappChatUrl } from "@/lib/site";
 export function SiteFooter() {
   const whatsappUrl = whatsappChatUrl();
   return (
-    <footer className="bg-night text-white">
-      <div className="mx-auto grid max-w-6xl gap-12 px-5 py-16 md:grid-cols-12 md:px-8">
-        <div className="md:col-span-4">
+    <footer className="bg-night pb-[calc(5rem+env(safe-area-inset-bottom))] text-white md:pb-0">
+      <div className="mx-auto grid max-w-6xl gap-x-8 gap-y-10 sm:grid-cols-2 px-5 py-16 md:grid-cols-12 md:px-8">
+        <div className="sm:col-span-2 md:col-span-4">
           <Logo variant="light" withTagline markId="footer" />
           <p className="mt-5 max-w-sm text-sm leading-6 text-white/70">
             CARRIOVA est une plateforme digitale de carrière et d’employabilité. Elle relie
@@ -74,7 +74,7 @@ export function SiteFooter() {
           <div className="max-w-md">
             <p className="text-sm font-semibold">Recevez nos conseils carrière et opportunités.</p>
             <p className="mt-1 text-sm text-white/65">
-              Un e-mail utile, avec votre consentement. Pas de promesse artificielle.
+              Des repères pour avancer, directement dans votre boîte mail. Désinscription à tout moment.
             </p>
           </div>
           <NewsletterForm tone="dark" />

@@ -3,29 +3,35 @@ import { Pool } from "pg";
 import { serverEnv } from "@/lib/env";
 import * as schema from "./schema";
 
-const databaseUrl = serverEnv.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error(
-    "DATABASE_URL is required. Copy .env.example to .env for local development, or set it in your hosting provider.",
-  );
-}
+export const databaseConfigured = Boolean(serverEnv.DATABASE_URL);
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
 };
 
-export const pool =
-  globalForDb.__arenaNextJsPostgresqlPool ??
-  new Pool({
-    connectionString: databaseUrl,
-    max: 10,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
-  });
+function createDatabase() {
+  if (!databaseConfigured) {
+    throw new Error("DATABASE_URL is required to access PostgreSQL.");
+  }
 
-if (!serverEnv.isProduction) {
-  globalForDb.__arenaNextJsPostgresqlPool = pool;
+  const pool =
+    globalForDb.__arenaNextJsPostgresqlPool ??
+    new Pool({
+      connectionString: serverEnv.DATABASE_URL,
+      max: 10,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 5_000,
+    });
+
+  if (!serverEnv.isProduction) {
+    globalForDb.__arenaNextJsPostgresqlPool = pool;
+  }
+  return drizzle(pool, { schema });
 }
 
-export const db = drizzle(pool, { schema });
+let database: ReturnType<typeof createDatabase> | undefined;
+
+// Initialisation à la première requête : les pages statiques restent accessibles sans base.
+export function getDb() {
+  return (database ??= createDatabase());
+}

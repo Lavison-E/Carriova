@@ -102,3 +102,27 @@ body {
     transition: none !important;
   }
 }
+
+.career-journey {
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(3, 72, 214, 0.35), transparent 65%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(0, 18, 82, 0.25));
+  box-shadow: 0 28px 70px rgba(0, 5, 36, 0.25);
+}
+
+#contenu {
+  scroll-margin-top: 6rem;
+}
+
+summary {
+  min-height: 1.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

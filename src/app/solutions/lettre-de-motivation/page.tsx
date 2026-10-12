@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { DocumentPreview } from "@/components/solutions/CareerVisuals";
 import { SolutionView } from "@/components/solutions/SolutionView";
 import { Section } from "@/components/ui/primitives";
 import { getFaqs } from "@/lib/queries";
@@ -29,15 +29,7 @@ export default async function LetterPage() {
               objectif à une contribution possible.
             </p>
           </div>
-          <div className="overflow-hidden rounded-[2rem]">
-            <Image
-              src="/images/letter-craft.jpg"
-              alt="Lettre de motivation travaillée avec soin"
-              width={900}
-              height={700}
-              className="h-full w-full object-cover"
-            />
-          </div>
+          <DocumentPreview variant="letter" />
         </div>
       </Section>
     </>

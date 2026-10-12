@@ -12,7 +12,7 @@ const variantClass: Record<ButtonVariant, string> = {
     "bg-white text-night border border-line hover:border-bright hover:text-bright",
   ghost: "bg-transparent text-white border border-white/25 hover:bg-white/10",
   orange:
-    "bg-orange text-white hover:bg-[#d45307] shadow-[0_10px_24px_rgba(238,94,8,0.28)]",
+    "bg-[#c94e04] text-white hover:bg-[#ad4203] shadow-[0_10px_24px_rgba(238,94,8,0.28)]",
   white: "bg-white text-night hover:bg-soft",
 };
 

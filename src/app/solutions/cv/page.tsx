@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { DocumentPreview } from "@/components/solutions/CareerVisuals";
 import { SolutionView } from "@/components/solutions/SolutionView";
 import { Section } from "@/components/ui/primitives";
 import { getFaqs } from "@/lib/queries";
@@ -22,15 +22,7 @@ export default async function CvSolutionPage() {
       <SolutionView content={solutionPages.cv} faqs={faqs} />
       <Section tone="paper">
         <div className="grid items-center gap-10 md:grid-cols-2">
-          <div className="overflow-hidden rounded-[2rem]">
-            <Image
-              src="/images/cv-craft.jpg"
-              alt="Composition d’un CV professionnel CARRIOVA"
-              width={900}
-              height={700}
-              className="h-full w-full object-cover"
-            />
-          </div>
+          <DocumentPreview variant="cv" />
           <div>
             <h2 className="text-3xl font-extrabold text-night">Le CV n’est pas un modèle. C’est une décision.</h2>
             <p className="mt-4 text-base leading-7 text-muted">

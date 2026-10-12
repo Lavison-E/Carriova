@@ -15,9 +15,11 @@ export const metadata = buildMetadata({
 export default async function ContactPage({
   searchParams,
 }: {
-  searchParams: Promise<{ objet?: string }>;
+  searchParams: Promise<{ objet?: string | string[] }>;
 }) {
   const { objet } = await searchParams;
+  const requestedInterest = Array.isArray(objet) ? objet[0] : objet;
+  const interest = ["emploi", "cv", "audit-cv", "lettre", "reconversion", "coaching", "recruteur"].includes(requestedInterest ?? "") ? requestedInterest : undefined;
   const whatsappUrl = whatsappChatUrl();
   const crumbs = [
     { href: "/", label: "Accueil" },
@@ -36,7 +38,7 @@ export default async function ContactPage({
         <div className="grid gap-10 md:grid-cols-5">
           <div className="md:col-span-3">
             <Card>
-              <ContactForm defaultInterest={objet} />
+              <ContactForm defaultInterest={interest} />
             </Card>
           </div>
           <div className="md:col-span-2">

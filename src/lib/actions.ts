@@ -1,9 +1,8 @@
 "use server";
 
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { after } from "next/server";
-import { db } from "@/db";
+import { databaseConfigured, getDb } from "@/db";
 import { accounts, analyticsEvents, coachingRequests, leads } from "@/db/schema";
 import { serverEnv } from "@/lib/env";
 import { dispatchLeadEvent, type LeadEventName, type LeadPayload } from "@/lib/integrations";
@@ -40,8 +39,19 @@ const COACHING_LABELS: Record<string, string> = {
 };
 
 /** E-mails, WhatsApp et CRM partent après la réponse : un échec n’annule jamais la demande. */
-function scheduleIntegrations(name: LeadEventName, leadId: number | null, lead: LeadPayload) {
+function scheduleIntegrations(name: LeadEventName, leadId: number, lead: LeadPayload) {
   after(() => dispatchLeadEvent({ name, leadId, lead }));
+}
+
+function scheduleAnalytics(event: typeof analyticsEvents.$inferInsert) {
+  after(async () => {
+    try {
+      await getDb().insert(analyticsEvents).values(event);
+    } catch {
+      // La mesure d’audience ne doit jamais faire échouer une demande déjà enregistrée.
+      console.error("[analytics] unable to record submission event");
+    }
+  });
 }
 
 /** N’annonce un accusé de réception que si l’envoi d’e-mails est réellement configuré. */
@@ -62,7 +72,7 @@ export async function submitLead(
 
   const firstName = clip(asString(formData, "firstName"), 80);
   const lastName = clip(asString(formData, "lastName"), 80);
-  const email = clip(asString(formData, "email").toLowerCase(), 255);
+  const email = asString(formData, "email").toLowerCase();
   const whatsapp = sanitizePhone(asString(formData, "whatsapp"));
   const objective = clip(asString(formData, "objective"), 160);
   const interest = clip(asString(formData, "interest"), 160);
@@ -104,19 +114,19 @@ export async function submitLead(
     consentMarketing,
   };
 
-  let leadId: number | null = null;
+  let leadId: number;
   try {
-    const [row] = await db.insert(leads).values(lead).returning({ id: leads.id });
-    leadId = row?.id ?? null;
-    await db.insert(analyticsEvents).values({
-      eventName: isNewsletter ? "newsletter_signup" : "lead_form_submit",
-      path: landingPage,
-      metadata: JSON.stringify({ type, interest, objective }),
-    });
+    const [row] = await getDb().insert(leads).values(lead).returning({ id: leads.id });
+    leadId = row.id;
   } catch {
     return { ok: false, message: genericError };
   }
 
+  scheduleAnalytics({
+    eventName: isNewsletter ? "newsletter_signup" : "lead_form_submit",
+    path: landingPage,
+    metadata: JSON.stringify({ type, interest, objective }),
+  });
   scheduleIntegrations(isNewsletter ? "newsletter.subscribed" : "lead.created", leadId, lead);
 
   return {
@@ -149,7 +159,7 @@ export async function createAccount(
 
   const firstName = clip(asString(formData, "firstName"), 80);
   const lastName = clip(asString(formData, "lastName"), 80);
-  const email = clip(asString(formData, "email").toLowerCase(), 255);
+  const email = asString(formData, "email").toLowerCase();
   const objective = clip(asString(formData, "objective"), 160);
   const consentPrivacy = asString(formData, "consentPrivacy") === "on";
   const consentMarketing = asString(formData, "consentMarketing") === "on";
@@ -180,46 +190,35 @@ export async function createAccount(
     consentMarketing,
   };
 
-  let leadId: number | null = null;
+  let leadId: number | null;
   try {
-    const existing = await db
-      .select({ id: accounts.id })
-      .from(accounts)
-      .where(eq(accounts.email, email))
-      .limit(1);
-    if (existing[0]) {
-      return {
-        ok: false,
-        message: "Un compte existe déjà avec cet e-mail. Connectez-vous pour continuer.",
-        fieldErrors: { email: "Cet e-mail est déjà enregistré." },
-      };
-    }
+    leadId = await getDb().transaction(async (tx) => {
+      const [account] = await tx
+        .insert(accounts)
+        .values({ firstName, lastName, email, objective: objective || null, consentMarketing })
+        .onConflictDoNothing({ target: accounts.email })
+        .returning({ id: accounts.id });
+      if (!account) return null;
 
-    await db.insert(accounts).values({
-      firstName,
-      lastName,
-      email,
-      objective: objective || null,
-      consentMarketing,
-    });
-
-    const [row] = await db.insert(leads).values(lead).returning({ id: leads.id });
-    leadId = row?.id ?? null;
-
-    await db.insert(analyticsEvents).values({
-      eventName: "account_created",
-      path: "/compte/creer",
-      metadata: JSON.stringify({ objective }),
+      const [row] = await tx.insert(leads).values(lead).returning({ id: leads.id });
+      return row.id;
     });
   } catch {
     return { ok: false, message: genericError };
   }
 
-  scheduleIntegrations("account.created", leadId, lead);
+  if (leadId !== null) {
+    scheduleAnalytics({
+      eventName: "account_created",
+      path: "/compte/creer",
+      metadata: JSON.stringify({ objective }),
+    });
+    scheduleIntegrations("account.created", leadId, lead);
+  }
 
   return {
     ok: true,
-    message: `Votre préinscription est enregistrée. L’espace authentifié (CV, lettres, demandes, préférences) sera ouvert progressivement — ceci n’est pas encore une connexion sécurisée par mot de passe.${confirmationNote()}`,
+    message: "Votre préinscription est enregistrée. Si cette adresse était déjà inscrite, elle est conservée. L’espace de connexion n’est pas encore ouvert.",
   };
 }
 
@@ -231,7 +230,7 @@ export async function loginAccount(
     return { ok: false, message: rateError };
   }
 
-  const email = clip(asString(formData, "email").toLowerCase(), 255);
+  const email = asString(formData, "email").toLowerCase();
   if (!email || !isEmail(email)) {
     return {
       ok: false,
@@ -240,33 +239,13 @@ export async function loginAccount(
     };
   }
 
-  try {
-    const existing = await db
-      .select({ firstName: accounts.firstName })
-      .from(accounts)
-      .where(eq(accounts.email, email))
-      .limit(1);
-
-    await db.insert(analyticsEvents).values({
-      eventName: "login_request",
-      path: "/compte/connexion",
-      metadata: JSON.stringify({ found: Boolean(existing[0]) }),
-    });
-
-    if (!existing[0]) {
-      return {
-        ok: false,
-        message: "Aucun compte n’est associé à cet e-mail. Vous pouvez en créer un.",
-      };
-    }
-
-    return {
-      ok: true,
-      message: `Bonjour ${existing[0].firstName}. Votre préinscription existe. L’authentification complète (mot de passe, session) n’est pas encore ouverte.`,
-    };
-  } catch {
-    return { ok: false, message: genericError };
+  if (databaseConfigured) {
+    scheduleAnalytics({ eventName: "login_request", path: "/compte/connexion" });
   }
+  return {
+    ok: false,
+    message: "L’espace de connexion n’est pas encore ouvert. Les préinscriptions seront informées de son ouverture par e-mail.",
+  };
 }
 
 export async function submitCoaching(
@@ -282,9 +261,12 @@ export async function submitCoaching(
 
   const firstName = clip(asString(formData, "firstName"), 80);
   const lastName = clip(asString(formData, "lastName"), 80);
-  const email = clip(asString(formData, "email").toLowerCase(), 255);
+  const email = asString(formData, "email").toLowerCase();
   const whatsapp = sanitizePhone(asString(formData, "whatsapp"));
-  const coachingType = COACHING_LABELS[asString(formData, "coachingType")] ?? "";
+  const requestedCoachingType = asString(formData, "coachingType");
+  const coachingType = Object.hasOwn(COACHING_LABELS, requestedCoachingType)
+    ? COACHING_LABELS[requestedCoachingType]
+    : "";
   const availability = clip(asString(formData, "availability"), 200);
   const message = clip(asString(formData, "message"), 4000);
   const consentPrivacy = asString(formData, "consentPrivacy") === "on";
@@ -320,30 +302,32 @@ export async function submitCoaching(
     consentMarketing,
   };
 
-  let leadId: number | null = null;
+  let leadId: number;
   try {
-    await db.insert(coachingRequests).values({
-      firstName,
-      lastName,
-      email,
-      whatsapp: whatsapp || null,
-      coachingType,
-      availability: availability || null,
-      message: message || null,
-      consentPrivacy,
-    });
+    leadId = await getDb().transaction(async (tx) => {
+      await tx.insert(coachingRequests).values({
+        firstName,
+        lastName,
+        email,
+        whatsapp: whatsapp || null,
+        coachingType,
+        availability: availability || null,
+        message: message || null,
+        consentPrivacy,
+      });
 
-    const [row] = await db.insert(leads).values(lead).returning({ id: leads.id });
-    leadId = row?.id ?? null;
-
-    await db.insert(analyticsEvents).values({
-      eventName: "coaching_booking",
-      path: "/solutions/coaching",
-      metadata: JSON.stringify({ coachingType }),
+      const [row] = await tx.insert(leads).values(lead).returning({ id: leads.id });
+      return row.id;
     });
   } catch {
     return { ok: false, message: genericError };
   }
+
+  scheduleAnalytics({
+    eventName: "coaching_booking",
+    path: "/solutions/coaching",
+    metadata: JSON.stringify({ coachingType }),
+  });
 
   scheduleIntegrations("coaching.requested", leadId, lead);
 

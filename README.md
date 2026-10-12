@@ -31,7 +31,7 @@ Le contenu éditorial, les offres, les FAQ et plusieurs données du site sont g�
 ```bash
 git clone https://github.com/Lavison-E/Carriova.git
 cd Carriova
-npm install
+npm ci
 ```
 
 Créez votre fichier d’environnement local à partir du modèle :
@@ -73,6 +73,10 @@ npm run dev
 
 Ouvrez [http://localhost:3000](http://localhost:3000).
 
+Sans `DATABASE_URL`, les pages de présentation restent consultables avec des listes de contenu vides. Les formulaires ne prétendent pas enregistrer de demandes et `/api/health` renvoie HTTP 503. Une base configurée mais inaccessible reste une erreur explicite.
+
+L’inscription enregistre une demande d’accompagnement. L’espace personnel et la connexion authentifiée ne sont pas encore disponibles.
+
 ## Commandes disponibles
 
 | Commande | Description |
@@ -80,6 +84,7 @@ Ouvrez [http://localhost:3000](http://localhost:3000).
 | `npm run dev` | Démarre le serveur Next.js en développement. |
 | `npm run build` | Produit le build de production. |
 | `npm run start` | Démarre le build de production. |
+| `npm test` | Vérifie les cas de régression serveur sans base externe. |
 | `npm run lint` | Vérifie le code avec ESLint. |
 | `npm run typecheck` | Vérifie les types TypeScript. |
 

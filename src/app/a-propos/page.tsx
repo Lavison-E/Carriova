@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { CareerPathVisual } from "@/components/solutions/CareerVisuals";
 import { PageHero } from "@/components/layout/PageHero";
 import { ButtonLink, Card, JsonLd, Section, SectionHeader } from "@/components/ui/primitives";
 import { breadcrumbJsonLd, buildMetadata } from "@/lib/seo";
@@ -36,15 +36,7 @@ export default function AboutPage() {
               text="CARRIOVA n’est pas un générateur de CV, ni un job board, ni un chatbot, ni un site de coaching générique. C’est une plateforme d’employabilité qui relie méthode, technologie et expertise."
             />
           </div>
-          <div className="overflow-hidden rounded-[2rem]">
-            <Image
-              src="/images/young-professional.jpg"
-              alt="Professionnel regardant vers l’avenir, métaphore de la promesse CARRIOVA"
-              width={900}
-              height={700}
-              className="h-full w-full object-cover"
-            />
-          </div>
+          <CareerPathVisual />
         </div>
       </Section>
       <Section tone="paper">

@@ -49,13 +49,13 @@ export const metadata: Metadata = {
     siteName: "CARRIOVA",
     title: "CARRIOVA — Révélez votre potentiel. Boostez votre carrière.",
     description: siteConfig.description,
-    images: [{ url: "/images/og-default.jpg", width: 1200, height: 630, alt: "CARRIOVA" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "CARRIOVA" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "CARRIOVA",
     description: siteConfig.description,
-    images: ["/images/og-default.jpg"],
+    images: ["/opengraph-image"],
   },
   robots: { index: true, follow: true },
   icons: { icon: "/brand/mark.svg" },
@@ -78,7 +78,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           Aller au contenu
         </a>
         <SiteHeader />
-        <main id="contenu" className="pb-16 md:pb-0">
+        <main id="contenu">
           {children}
         </main>
         <SiteFooter />

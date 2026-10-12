@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId, type ReactNode } from "react";
+import { useActionState, useId, useState, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, type ReactNode } from "react";
 import {
   createAccount,
   loginAccount,
@@ -12,6 +12,38 @@ import {
 import { Button, cn } from "@/components/ui/primitives";
 
 const initial: ActionState = { ok: false, message: "" };
+
+type FormAction = (previous: ActionState, data: FormData) => Promise<ActionState>;
+
+function useFormAction(serverAction: FormAction) {
+  const [state, action, pending] = useActionState(serverAction, initial);
+  const [submission, setSubmission] = useState(() => ({ response: state, revision: 0 }));
+
+  // Keep the Server Action itself on the form for progressive enhancement.
+  // Reset controlled fields only after a confirmed successful submission.
+  if (submission.response !== state) {
+    setSubmission({ response: state, revision: submission.revision + (state.ok ? 1 : 0) });
+  }
+
+  return [state, action, pending, submission.revision] as const;
+}
+
+type TextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "defaultValue" | "onChange"> & { defaultValue?: string };
+
+function PreservedInput({ defaultValue = "", ...props }: TextInputProps) {
+  const [value, setValue] = useState(defaultValue);
+  return <input {...props} value={value} onChange={(event) => setValue(event.target.value)} />;
+}
+
+function PreservedSelect({ defaultValue = "", ...props }: Omit<SelectHTMLAttributes<HTMLSelectElement>, "value" | "defaultValue" | "onChange"> & { defaultValue?: string }) {
+  const [value, setValue] = useState(defaultValue);
+  return <select {...props} value={value} onChange={(event) => setValue(event.target.value)} />;
+}
+
+function PreservedTextarea(props: Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue" | "onChange">) {
+  const [value, setValue] = useState("");
+  return <textarea {...props} value={value} onChange={(event) => setValue(event.target.value)} />;
+}
 
 function Honeypot() {
   return (
@@ -49,7 +81,7 @@ function Field({
   return (
     <label className="block text-sm font-medium text-night" htmlFor={id}>
       {label}
-      <input
+      <PreservedInput
         id={id}
         name={name}
         type={type}
@@ -75,49 +107,61 @@ function Consent({
   children,
   error,
   required,
+  dark = false,
 }: {
   name: string;
   children: ReactNode;
   error?: string;
   required?: boolean;
+  dark?: boolean;
 }) {
   const uid = useId();
+  const errorId = `${uid}-error`;
+  const [checked, setChecked] = useState(false);
   return (
-    <label className="flex items-start gap-2 text-xs leading-5 text-muted" htmlFor={uid}>
+    <label className={cn("flex items-start gap-2 text-xs leading-5", dark ? "text-white/75" : "text-muted")} htmlFor={uid}>
       <input
         id={uid}
         type="checkbox"
+        checked={checked}
+        onChange={(event) => setChecked(event.target.checked)}
         name={name}
         required={required}
-        className="mt-0.5 accent-[#0348D6]"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        className="mt-0.5 h-4 w-4 shrink-0 accent-[#0348D6]"
       />
       <span>
         {children}
-        {error ? <span className="mt-1 block text-orange">{error}</span> : null}
+        {error ? <span id={errorId} className={cn("mt-1 block", dark ? "text-gold" : "text-orange")}>{error}</span> : null}
       </span>
     </label>
   );
 }
 
 export function NewsletterForm({ tone = "light" }: { tone?: "light" | "dark" }) {
-  const [state, action, pending] = useActionState(submitNewsletter, initial);
+  const [state, action, pending, revision] = useFormAction(submitNewsletter);
   const dark = tone === "dark";
+  const emailErrorId = `${useId()}-email-error`;
 
   return (
-    <form action={action} className="relative flex w-full max-w-md flex-col gap-3">
+    <form key={revision} action={action} onReset={(event) => event.preventDefault()} className="relative flex w-full max-w-md flex-col gap-3">
       <Honeypot />
       <input type="hidden" name="landingPage" value="/newsletter" />
       <input type="hidden" name="source" value="newsletter" />
       <div className="flex flex-col gap-2 sm:flex-row">
-        <input
+        <PreservedInput
           name="email"
           type="email"
           required
           maxLength={255}
           aria-label="Adresse e-mail"
+          autoComplete="email"
+          aria-invalid={state.fieldErrors?.email ? true : undefined}
+          aria-describedby={state.fieldErrors?.email ? emailErrorId : undefined}
           placeholder="Votre e-mail"
           className={cn(
-            "h-11 flex-1 rounded-full border px-4 text-sm outline-none",
+            "h-11 min-w-0 flex-1 rounded-full border px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-bright",
             dark ? "border-white/20 bg-white/10 text-white placeholder:text-white/50" : "border-line bg-white",
           )}
         />
@@ -125,14 +169,15 @@ export function NewsletterForm({ tone = "light" }: { tone?: "light" | "dark" }) 
           {pending ? "Envoi…" : "S’inscrire"}
         </Button>
       </div>
-      <Consent name="consentPrivacy" required error={state.fieldErrors?.consentPrivacy}>
+      {state.fieldErrors?.email ? <p id={emailErrorId} className={cn("text-xs", dark ? "text-gold" : "text-orange")}>{state.fieldErrors.email}</p> : null}
+      <Consent name="consentPrivacy" dark={dark} required error={state.fieldErrors?.consentPrivacy}>
         J’accepte la{" "}
         <a href="/legal/confidentialite" className={dark ? "underline" : "text-bright underline"}>
           politique de confidentialité
         </a>
         .
       </Consent>
-      <Consent name="consentMarketing" required error={state.fieldErrors?.consentMarketing}>
+      <Consent name="consentMarketing" dark={dark} required error={state.fieldErrors?.consentMarketing}>
         J’accepte de recevoir des conseils carrière et des informations sur les opportunités CARRIOVA.
       </Consent>
       {state.message ? (
@@ -145,10 +190,10 @@ export function NewsletterForm({ tone = "light" }: { tone?: "light" | "dark" }) 
 }
 
 export function ContactForm({ defaultInterest }: { defaultInterest?: string }) {
-  const [state, action, pending] = useActionState(submitLead, initial);
+  const [state, action, pending, revision] = useFormAction(submitLead);
 
   return (
-    <form action={action} className="relative grid gap-4">
+    <form key={revision} action={action} onReset={(event) => event.preventDefault()} className="relative grid gap-4">
       <Honeypot />
       <input type="hidden" name="type" value="contact" />
       <input type="hidden" name="source" value="contact_page" />
@@ -158,7 +203,7 @@ export function ContactForm({ defaultInterest }: { defaultInterest?: string }) {
         <Field name="lastName" label="Nom" autoComplete="family-name" />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <Field name="email" label="E-mail" type="email" required error={state.fieldErrors?.email} autoComplete="email" />
+        <Field name="email" label="E-mail" type="email" maxLength={255} required error={state.fieldErrors?.email} autoComplete="email" />
         <Field
           name="whatsapp"
           label="WhatsApp (optionnel)"
@@ -170,7 +215,7 @@ export function ContactForm({ defaultInterest }: { defaultInterest?: string }) {
       </div>
       <label className="block text-sm font-medium text-night">
         Objectif professionnel
-        <select
+        <PreservedSelect
           name="objective"
           defaultValue={defaultInterest ?? ""}
           className="mt-1.5 h-11 w-full rounded-xl border border-line bg-white px-3 text-sm"
@@ -178,14 +223,16 @@ export function ContactForm({ defaultInterest }: { defaultInterest?: string }) {
           <option value="">Choisir</option>
           <option value="emploi">Je cherche un emploi</option>
           <option value="cv">Je veux améliorer mon CV</option>
+          <option value="audit-cv">Je souhaite un audit de mon CV</option>
+          <option value="lettre">Je veux préparer une lettre de motivation</option>
           <option value="reconversion">Je veux évoluer ou me reconvertir</option>
           <option value="coaching">Je veux un coaching</option>
           <option value="recruteur">Je veux recruter</option>
-        </select>
+        </PreservedSelect>
       </label>
       <label className="block text-sm font-medium text-night">
         Message
-        <textarea
+        <PreservedTextarea
           name="message"
           rows={5}
           maxLength={4000}
@@ -215,23 +262,23 @@ export function ContactForm({ defaultInterest }: { defaultInterest?: string }) {
 }
 
 export function AccountForm() {
-  const [state, action, pending] = useActionState(createAccount, initial);
+  const [state, action, pending, revision] = useFormAction(createAccount);
   return (
-    <form action={action} className="relative grid gap-4">
+    <form key={revision} action={action} onReset={(event) => event.preventDefault()} className="relative grid gap-4">
       <Honeypot />
       <div className="grid gap-4 md:grid-cols-2">
         <Field name="firstName" label="Prénom" required error={state.fieldErrors?.firstName} />
         <Field name="lastName" label="Nom" required error={state.fieldErrors?.lastName} />
       </div>
-      <Field name="email" label="E-mail" type="email" required error={state.fieldErrors?.email} />
+      <Field name="email" label="E-mail" type="email" maxLength={255} required error={state.fieldErrors?.email} autoComplete="email" />
       <label className="block text-sm font-medium text-night">
         Votre priorité
-        <select name="objective" className="mt-1.5 h-11 w-full rounded-xl border border-line bg-white px-3 text-sm">
+        <PreservedSelect name="objective" defaultValue="cv" className="mt-1.5 h-11 w-full rounded-xl border border-line bg-white px-3 text-sm">
           <option value="cv">Créer ou améliorer mon CV</option>
           <option value="lettre">Créer une lettre de motivation</option>
           <option value="emploi">Trouver un emploi</option>
           <option value="coaching">Réserver un coaching</option>
-        </select>
+        </PreservedSelect>
       </label>
       <Consent name="consentPrivacy" required error={state.fieldErrors?.consentPrivacy}>
         J’accepte la{" "}
@@ -248,7 +295,7 @@ export function AccountForm() {
         Je souhaite recevoir des ressources et opportunités CARRIOVA.
       </Consent>
       <Button type="submit" variant="orange" disabled={pending}>
-        {pending ? "Création…" : "Créer mon compte"}
+        {pending ? "Envoi…" : "Envoyer mon inscription"}
       </Button>
       {state.message ? (
         <p role="status" className={cn("text-sm", state.ok ? "text-royal" : "text-orange")}>
@@ -260,10 +307,10 @@ export function AccountForm() {
 }
 
 export function LoginForm() {
-  const [state, action, pending] = useActionState(loginAccount, initial);
+  const [state, action, pending, revision] = useFormAction(loginAccount);
   return (
-    <form action={action} className="grid gap-4">
-      <Field name="email" label="E-mail" type="email" required error={state.fieldErrors?.email} />
+    <form key={revision} action={action} onReset={(event) => event.preventDefault()} className="grid gap-4">
+      <Field name="email" label="E-mail" type="email" maxLength={255} required error={state.fieldErrors?.email} autoComplete="email" />
       <Button type="submit" disabled={pending}>
         {pending ? "Vérification…" : "Continuer"}
       </Button>
@@ -277,16 +324,16 @@ export function LoginForm() {
 }
 
 export function CoachingForm() {
-  const [state, action, pending] = useActionState(submitCoaching, initial);
+  const [state, action, pending, revision] = useFormAction(submitCoaching);
   return (
-    <form action={action} className="relative grid gap-4">
+    <form key={revision} action={action} onReset={(event) => event.preventDefault()} className="relative grid gap-4">
       <Honeypot />
       <div className="grid gap-4 md:grid-cols-2">
         <Field name="firstName" label="Prénom" required error={state.fieldErrors?.firstName} />
         <Field name="lastName" label="Nom" required error={state.fieldErrors?.lastName} />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <Field name="email" label="E-mail" type="email" required error={state.fieldErrors?.email} />
+        <Field name="email" label="E-mail" type="email" maxLength={255} required error={state.fieldErrors?.email} autoComplete="email" />
         <Field
           name="whatsapp"
           label="WhatsApp (optionnel)"
@@ -298,7 +345,7 @@ export function CoachingForm() {
       </div>
       <label className="block text-sm font-medium text-night">
         Type de séance
-        <select
+        <PreservedSelect
           name="coachingType"
           required
           className="mt-1.5 h-11 w-full rounded-xl border border-line bg-white px-3 text-sm"
@@ -310,7 +357,7 @@ export function CoachingForm() {
           <option value="entretien">Préparation aux entretiens</option>
           <option value="positionnement">Positionnement professionnel</option>
           <option value="progression">Progression de carrière</option>
-        </select>
+        </PreservedSelect>
         {state.fieldErrors?.coachingType ? (
           <span className="mt-1 block text-xs text-orange">{state.fieldErrors.coachingType}</span>
         ) : null}
@@ -318,7 +365,7 @@ export function CoachingForm() {
       <Field name="availability" label="Disponibilités indicatives" placeholder="Ex. mardi matin, jeudi soir" />
       <label className="block text-sm font-medium text-night">
         Contexte
-        <textarea
+        <PreservedTextarea
           name="message"
           rows={4}
           maxLength={4000}
@@ -348,16 +395,16 @@ export function CoachingForm() {
 }
 
 export function ResourceLeadForm({ resource }: { resource: string }) {
-  const [state, action, pending] = useActionState(submitLead, initial);
+  const [state, action, pending, revision] = useFormAction(submitLead);
   return (
-    <form action={action} className="relative grid gap-3">
+    <form key={revision} action={action} onReset={(event) => event.preventDefault()} className="relative grid gap-3">
       <Honeypot />
       <input type="hidden" name="type" value="resource" />
       <input type="hidden" name="interest" value={resource} />
       <input type="hidden" name="source" value="resource_gate" />
       <input type="hidden" name="landingPage" value="/ressources" />
       <Field name="firstName" label="Prénom" required error={state.fieldErrors?.firstName} />
-      <Field name="email" label="E-mail" type="email" required error={state.fieldErrors?.email} />
+      <Field name="email" label="E-mail" type="email" maxLength={255} required error={state.fieldErrors?.email} autoComplete="email" />
       <Consent name="consentPrivacy" required error={state.fieldErrors?.consentPrivacy}>
         J’accepte la{" "}
         <a className="text-bright underline" href="/legal/confidentialite">

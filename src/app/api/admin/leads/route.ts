@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { desc } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { leads } from "@/db/schema";
 import { serverEnv } from "@/lib/env";
 import { rateLimit } from "@/lib/security";
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
   const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 5000) : 1000;
 
   try {
-    const rows = await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(limit);
+    const rows = await getDb().select().from(leads).orderBy(desc(leads.createdAt)).limit(limit);
     const lines = [
       COLUMNS.join(","),
       ...rows.map((row) => COLUMNS.map((column) => csvCell(row[column])).join(",")),

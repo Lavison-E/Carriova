@@ -23,7 +23,7 @@ export function buildMetadata({
   path,
   keywords = [],
   noindex = false,
-  image = "/images/og-default.jpg",
+  image = "/opengraph-image",
 }: BuildMeta): Metadata {
   const url = absoluteUrl(path);
   const fullTitle = title.includes("CARRIOVA") ? title : title;

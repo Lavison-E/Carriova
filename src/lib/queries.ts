@@ -1,5 +1,5 @@
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { databaseConfigured, getDb } from "@/db";
 import { blogPosts, faqs, jobs, pricingOffers, testimonials } from "@/db/schema";
 
 export async function getPublishedJobs(filters?: {
@@ -10,6 +10,7 @@ export async function getPublishedJobs(filters?: {
   experience?: string;
   workMode?: string;
 }) {
+  if (!databaseConfigured) return [];
   const clauses = [eq(jobs.isPublished, true)];
 
   if (filters?.q) {
@@ -29,7 +30,7 @@ export async function getPublishedJobs(filters?: {
   if (filters?.experience) clauses.push(eq(jobs.experience, filters.experience));
   if (filters?.workMode) clauses.push(eq(jobs.workMode, filters.workMode));
 
-  return db
+  return getDb()
     .select()
     .from(jobs)
     .where(and(...clauses))
@@ -37,14 +38,20 @@ export async function getPublishedJobs(filters?: {
 }
 
 export async function getJobBySlug(slug: string) {
-  const rows = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
+  if (!databaseConfigured) return null;
+  const rows = await getDb()
+    .select()
+    .from(jobs)
+    .where(and(eq(jobs.slug, slug), eq(jobs.isPublished, true)))
+    .limit(1);
   return rows[0] ?? null;
 }
 
 export async function getRelatedJobs(slug: string, industry?: string | null) {
+  if (!databaseConfigured) return [];
   const clauses = [eq(jobs.isPublished, true), sql`${jobs.slug} <> ${slug}`];
   if (industry) clauses.push(eq(jobs.industry, industry));
-  return db
+  return getDb()
     .select()
     .from(jobs)
     .where(and(...clauses))
@@ -53,7 +60,10 @@ export async function getRelatedJobs(slug: string, industry?: string | null) {
 }
 
 export async function getJobFacets() {
-  const rows = await db
+  if (!databaseConfigured) {
+    return { locations: [], industries: [], contractTypes: [], experiences: [], workModes: [] };
+  }
+  const rows = await getDb()
     .select({
       location: jobs.location,
       industry: jobs.industry,
@@ -77,9 +87,10 @@ export async function getJobFacets() {
 }
 
 export async function getPublishedPosts(cluster?: string) {
+  if (!databaseConfigured) return [];
   const clauses = [eq(blogPosts.isPublished, true)];
   if (cluster) clauses.push(eq(blogPosts.cluster, cluster));
-  return db
+  return getDb()
     .select()
     .from(blogPosts)
     .where(and(...clauses))
@@ -87,16 +98,18 @@ export async function getPublishedPosts(cluster?: string) {
 }
 
 export async function getPostBySlug(slug: string) {
-  const rows = await db
+  if (!databaseConfigured) return null;
+  const rows = await getDb()
     .select()
     .from(blogPosts)
-    .where(eq(blogPosts.slug, slug))
+    .where(and(eq(blogPosts.slug, slug), eq(blogPosts.isPublished, true)))
     .limit(1);
   return rows[0] ?? null;
 }
 
 export async function getRelatedPosts(slug: string, cluster: string) {
-  return db
+  if (!databaseConfigured) return [];
+  return getDb()
     .select()
     .from(blogPosts)
     .where(
@@ -110,7 +123,8 @@ export async function getRelatedPosts(slug: string, cluster: string) {
 }
 
 export async function getFaqs(page: string) {
-  return db
+  if (!databaseConfigured) return [];
+  return getDb()
     .select()
     .from(faqs)
     .where(eq(faqs.page, page))
@@ -118,7 +132,8 @@ export async function getFaqs(page: string) {
 }
 
 export async function getPricingOffers() {
-  return db
+  if (!databaseConfigured) return [];
+  return getDb()
     .select()
     .from(pricingOffers)
     .where(eq(pricingOffers.isAvailable, true))
@@ -126,7 +141,8 @@ export async function getPricingOffers() {
 }
 
 export async function getPublishedTestimonials() {
-  return db
+  if (!databaseConfigured) return [];
+  return getDb()
     .select()
     .from(testimonials)
     .where(eq(testimonials.isPublished, true));

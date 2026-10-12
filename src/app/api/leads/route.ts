@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { db } from "@/db";
+import { databaseConfigured, getDb } from "@/db";
 import { analyticsEvents, leads } from "@/db/schema";
 import { dispatchLeadEvent, type LeadPayload } from "@/lib/integrations";
 import { clip, isEmail, rateLimit, sanitizePhone } from "@/lib/security";
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   }
 
   const firstName = text(body.firstName, 80);
-  const email = text(body.email, 255).toLowerCase();
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!firstName || !isEmail(email) || body.consentPrivacy !== true) {
     return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   }
@@ -53,16 +53,29 @@ export async function POST(request: Request) {
     consentMarketing: body.consentMarketing === true,
   };
 
-  try {
-    const [row] = await db.insert(leads).values(lead).returning({ id: leads.id });
-    await db.insert(analyticsEvents).values({
-      eventName: "lead_form_submit",
-      path: "/api/leads",
-    });
-    // E-mails, WhatsApp et CRM après la réponse : n’échoue jamais la requête.
-    after(() => dispatchLeadEvent({ name: "lead.created", leadId: row?.id ?? null, lead }));
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ ok: false }, { status: 500 });
+  if (!databaseConfigured) {
+    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
   }
+
+  let leadId: number;
+  try {
+    const [row] = await getDb().insert(leads).values(lead).returning({ id: leads.id });
+    leadId = row.id;
+  } catch {
+    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
+  }
+
+  // Les effets secondaires ne changent jamais le résultat d’un enregistrement réussi.
+  after(async () => {
+    try {
+      await getDb().insert(analyticsEvents).values({
+        eventName: "lead_form_submit",
+        path: "/api/leads",
+      });
+    } catch {
+      console.error("[analytics] unable to record lead submission");
+    }
+  });
+  after(() => dispatchLeadEvent({ name: "lead.created", leadId, lead }));
+  return NextResponse.json({ ok: true });
 }

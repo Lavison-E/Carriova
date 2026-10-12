@@ -4,9 +4,9 @@ import { Card, JsonLd, Section } from "@/components/ui/primitives";
 import { breadcrumbJsonLd, buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
-  title: "Créer mon compte",
+  title: "Préparer mon espace",
   description:
-    "Créez votre compte CARRIOVA pour accéder progressivement à vos CV, lettres, demandes et opportunités.",
+    "Inscrivez votre demande auprès de CARRIOVA et indiquez votre priorité : CV, candidature, emploi ou coaching.",
   path: "/compte/creer",
   noindex: true,
 });
@@ -14,15 +14,15 @@ export const metadata = buildMetadata({
 export default function CreateAccountPage() {
   const crumbs = [
     { href: "/", label: "Accueil" },
-    { href: "/compte/creer", label: "Créer mon compte" },
+    { href: "/compte/creer", label: "Préparer mon espace" },
   ];
   return (
     <>
       <JsonLd data={breadcrumbJsonLd(crumbs.map((c) => ({ name: c.label, path: c.href })))} />
       <PageHero
         eyebrow="Compte"
-        title="Créer mon espace CARRIOVA."
-        text="Le site public explique et convertit. L’espace utilisateur accueillera CV, lettres, demandes, rendez-vous, opportunités et préférences de communication."
+        title="Votre prochain chapitre commence ici."
+        text="Présentez-nous votre besoin pour préparer votre accompagnement. Cette inscription enregistre votre demande ; l’espace personnel et la connexion sécurisée sont en préparation."
         crumbs={crumbs}
       />
       <Section>

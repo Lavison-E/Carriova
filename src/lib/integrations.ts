@@ -1,6 +1,6 @@
 import "server-only";
 import { createHmac, randomUUID } from "node:crypto";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { integrationLogs } from "@/db/schema";
 import { serverEnv } from "@/lib/env";
 
@@ -299,7 +299,7 @@ export async function dispatchLeadEvent(event: LeadEvent): Promise<void> {
   }
 
   try {
-    await db.insert(integrationLogs).values(
+    await getDb().insert(integrationLogs).values(
       attempts.map((attempt) => ({
         channel: attempt.channel,
         event: attempt.event.slice(0, 60),
