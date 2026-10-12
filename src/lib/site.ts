@@ -1,4 +1,4 @@
-export const DEFAULT_SITE_URL = "https://carriovaci.com";
+export const DEFAULT_SITE_URL = "https://www.carriovaci.com";
 
 /**
  * Normalise une origine publique (http/https, sans slash final).

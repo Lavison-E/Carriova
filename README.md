@@ -2,7 +2,7 @@
 
 Plateforme de carrière et d’employabilité pensée pour accompagner les candidats en Côte d’Ivoire et en Afrique de l’Ouest. CARRIOVA aide chacun à valoriser son parcours, préparer ses candidatures, explorer des opportunités et faire progresser sa carrière.
 
-Site : [carriovaci.com](https://carriovaci.com)
+Site : [www.carriovaci.com](https://www.carriovaci.com)
 
 ## Ce que propose le site
 
