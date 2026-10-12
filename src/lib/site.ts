@@ -11,6 +11,10 @@ export function normalizeSiteUrl(raw?: string | null): string | null {
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (url.hostname.toLowerCase() === "carriovaci.com") {
+      url.hostname = "www.carriovaci.com";
+      url.protocol = "https:";
+    }
     return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
   } catch {
     return null;
