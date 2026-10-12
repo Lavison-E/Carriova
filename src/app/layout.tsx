@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Instrument_Serif, Plus_Jakarta_Sans } from "next/font/google";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { StickyCta } from "@/components/layout/StickyCta";
@@ -17,6 +17,8 @@ const plusJakarta = Plus_Jakarta_Sans({
   display: "swap",
   weight: ["400", "500", "600", "700", "800"],
 });
+
+const instrumentSerif = Instrument_Serif({ subsets: ['latin'], weight: '400', style: ['normal', 'italic'], variable: '--font-instrument-serif', display: 'swap' });
 
 // Balises de validation Search Console / Bing Webmaster : rendues uniquement si configurées.
 const verification: NonNullable<Metadata["verification"]> = {};
@@ -70,7 +72,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr" className={plusJakarta.variable}>
+    <html lang="fr" data-scroll-behavior="smooth" className={`${plusJakarta.variable} ${instrumentSerif.variable}`}>
       <body className="bg-white font-sans text-ink antialiased">
         <JsonLd data={organizationJsonLd()} />
         <JsonLd data={websiteJsonLd()} />

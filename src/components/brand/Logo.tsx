@@ -21,8 +21,8 @@ export function Logo({
         alt=""
         width={2172}
         height={724}
-        priority={!withTagline}
-        sizes={withTagline ? "(max-width: 768px) 224px, 256px" : "160px"}
+        preload={!withTagline}
+        sizes={withTagline ? "(max-width: 768px) 224px, 256px" : "(max-width: 639px) 160px, 176px"}
         className={`block h-auto ${withTagline ? "w-56 sm:w-64" : "w-40 sm:w-44"}`}
       />
     </Link>

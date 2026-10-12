@@ -1,22 +1,23 @@
+import Link from "next/link";
 import { ResourceLeadForm } from "@/components/forms/LeadForms";
 import { PageHero } from "@/components/layout/PageHero";
-import { ButtonLink, Card, JsonLd, Section, SectionHeader } from "@/components/ui/primitives";
+import { JsonLd, Section } from "@/components/ui/primitives";
 import { breadcrumbJsonLd, buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
   title: "Ressources carrière",
   description:
-    "Blog, guides, conseils CV et ressources CARRIOVA pour progresser dans votre carrière, avec consentement.",
+    "Des articles, des guides et des conseils pour préparer votre CV, écrire vos candidatures et avancer dans votre carrière.",
   path: "/ressources",
 });
 
 const resources = [
-  { href: "/blog", title: "Blog", text: "Articles d’intention : CV, emploi, lettre, coaching." },
-  { href: "/guides", title: "Guides", text: "Parcours pas à pas pour construire vos livrables." },
-  { href: "/conseils-carriere", title: "Conseils carrière", text: "Direction, reconversion, employabilité." },
-  { href: "/faq", title: "FAQ", text: "Les réponses aux questions les plus fréquentes." },
-  { href: "/conseils-cv", title: "Conseils CV", text: "Méthode pour un CV lisible et utile." },
-  { href: "/lettre-de-motivation", title: "Lettre de motivation", text: "Pages et contenus dédiés à la lettre." },
+  { href: "/blog", title: "Le blog", text: "Des lectures pour mieux comprendre la recherche d’emploi et les moments clés d’une carrière.", cta: "Lire les articles" },
+  { href: "/guides", title: "Les guides", text: "Des repères concrets pour passer de votre première idée à une candidature aboutie.", cta: "Explorer les guides" },
+  { href: "/conseils-carriere", title: "Conseils carrière", text: "Faire le point, envisager une reconversion ou préparer votre prochaine évolution.", cta: "Prendre du recul" },
+  { href: "/faq", title: "Vos questions", text: "Les réponses aux questions que vous vous posez sur CARRIOVA et ses accompagnements.", cta: "Consulter les réponses" },
+  { href: "/conseils-cv", title: "Conseils CV", text: "Choisir les bons mots, rendre votre parcours lisible et faire ressortir vos réalisations.", cta: "Travailler mon CV" },
+  { href: "/lettre-de-motivation", title: "Lettre de motivation", text: "Exprimer ce qui vous motive et relier votre expérience aux besoins d’un poste.", cta: "Préparer ma lettre" },
 ];
 
 export default function ResourcesPage() {
@@ -24,38 +25,45 @@ export default function ResourcesPage() {
     { href: "/", label: "Accueil" },
     { href: "/ressources", label: "Ressources" },
   ];
+
   return (
     <>
       <JsonLd data={breadcrumbJsonLd(crumbs.map((c) => ({ name: c.label, path: c.href })))} />
       <PageHero
         eyebrow="Ressources"
         title="Apprendre, puis agir."
-        text="Un hub éditorial pour comprendre, puis un chemin clair vers CV, lettre, emploi ou coaching."
+        text="Les bonnes questions, des conseils pratiques et le temps de faire le point. Retrouvez ici de quoi préparer votre prochain pas professionnel."
         crumbs={crumbs}
       />
       <Section>
-        <div className="grid gap-5 md:grid-cols-3">
-          {resources.map((item) => (
-            <Card key={item.href}>
-              <h2 className="text-xl font-bold text-night">{item.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-muted">{item.text}</p>
-              <ButtonLink href={item.href} size="sm" className="mt-5">
-                Ouvrir
-              </ButtonLink>
-            </Card>
+        <ol className="grid gap-x-16 md:grid-cols-2 lg:gap-x-24">
+          {resources.map((item, index) => (
+            <li key={item.href} className="grid grid-cols-[2rem_1fr] gap-4 border-t border-night/20 py-9 sm:gap-6 sm:py-11">
+              <span aria-hidden="true" className="pt-1 text-xs font-semibold tabular-nums text-[#bd470d]">{String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-night">{item.title}</h2>
+                <p className="mt-4 max-w-md text-sm leading-7 text-muted">{item.text}</p>
+                <Link href={item.href} className="group mt-6 inline-flex min-h-11 items-center gap-4 text-sm font-semibold text-night underline decoration-night/25 underline-offset-4 transition-colors hover:text-[#bd470d] hover:decoration-[#bd470d]">
+                  {item.cta}
+                  <span aria-hidden="true" className="text-lg transition-transform group-hover:translate-x-1">↗</span>
+                </Link>
+              </div>
+            </li>
           ))}
-        </div>
+        </ol>
       </Section>
       <Section tone="paper">
-        <div className="grid gap-10 md:grid-cols-2">
-          <SectionHeader
-            eyebrow="Guide"
-            title="Recevoir un guide CV"
-            text="Laissez votre prénom et votre e-mail. Nous vous enverrons une ressource utile, uniquement avec votre consentement."
-          />
-          <Card>
+        <div className="grid items-start gap-10 md:grid-cols-2 lg:gap-24">
+          <div className="md:pt-4">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-[#bd470d]">Une ressource pour commencer</p>
+            <h2 className="font-editorial mt-5 text-5xl font-normal italic leading-[1.08] text-night">Votre CV,<br />avec un peu de recul.</h2>
+            <p className="mt-6 max-w-md text-sm leading-7 text-muted">Demandez notre guide CV pour vous aider à structurer votre parcours et préparer votre candidature. Laissez votre prénom et votre adresse e-mail : notre équipe vous transmettra la ressource.</p>
+            <p className="mt-5 max-w-md text-xs leading-6 text-muted">Vous choisissez si vous souhaitez aussi recevoir nos autres conseils et ressources.</p>
+          </div>
+          <div className="rounded-xl border border-night/15 bg-white p-6 sm:p-8">
+            <p className="mb-6 text-lg font-semibold text-night">Recevoir le guide CV</p>
             <ResourceLeadForm resource="guide-cv" />
-          </Card>
+          </div>
         </div>
       </Section>
     </>

@@ -7,19 +7,19 @@ type ButtonSize = "md" | "lg" | "sm";
 
 const variantClass: Record<ButtonVariant, string> = {
   primary:
-    "bg-bright text-white hover:bg-royal shadow-[0_10px_24px_rgba(3,72,214,0.28)]",
+    "bg-night text-white hover:bg-royal",
   secondary:
     "bg-white text-night border border-line hover:border-bright hover:text-bright",
   ghost: "bg-transparent text-white border border-white/25 hover:bg-white/10",
   orange:
-    "bg-[#c94e04] text-white hover:bg-[#ad4203] shadow-[0_10px_24px_rgba(238,94,8,0.28)]",
+    "bg-[#bd470d] text-white hover:bg-[#9e3708]",
   white: "bg-white text-night hover:bg-soft",
 };
 
 const sizeClass: Record<ButtonSize, string> = {
   sm: "h-10 px-4 text-sm",
-  md: "h-11 px-5 text-sm",
-  lg: "h-12 px-6 text-[0.95rem]",
+  md: "h-12 px-5 text-sm",
+  lg: "h-14 px-6 text-[0.95rem]",
 };
 
 export function cn(...parts: Array<string | false | null | undefined>) {
@@ -46,7 +46,7 @@ export function ButtonLink({
       href={href}
       data-event={eventName}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors",
+        "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors duration-200",
         variantClass[variant],
         sizeClass[size],
         className,
@@ -77,7 +77,7 @@ export function Button({
       type={type}
       disabled={disabled}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors disabled:opacity-60",
+        "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors duration-200 disabled:opacity-60 disabled:cursor-wait",
         variantClass[variant],
         sizeClass[size],
         className,
@@ -107,7 +107,7 @@ export function Section({
   };
   return (
     <section id={id} className={cn("py-20 md:py-28", tones[tone], className)}>
-      <div className="mx-auto w-full max-w-6xl px-5 md:px-8">{children}</div>
+      <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-12">{children}</div>
     </section>
   );
 }
@@ -116,7 +116,7 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
   return (
     <p
       className={cn(
-        "text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-bright",
+        "text-[0.68rem] font-bold uppercase tracking-[0.2em] text-[#9e3708]",
         className,
       )}
     >
@@ -145,7 +145,7 @@ export function SectionHeader({
       ) : null}
       <h2
         className={cn(
-          "mt-3 text-3xl font-extrabold tracking-tight md:text-4xl",
+          "mt-4 text-3xl font-semibold leading-[1.15] tracking-[-0.04em] md:text-[2.75rem]",
           light ? "text-white" : "text-night",
         )}
       >
@@ -170,7 +170,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-3xl border border-line bg-white p-6 shadow-[0_16px_40px_rgba(0,18,82,0.06)]",
+        "rounded-xl border border-line bg-white p-6",
         className,
       )}
     >
@@ -182,7 +182,7 @@ export function Card({
 export function Badge({ children, tone = "blue" }: { children: ReactNode; tone?: "blue" | "orange" | "navy" }) {
   const tones = {
     blue: "bg-soft text-royal",
-    orange: "bg-[#fff1e6] text-orange",
+    orange: "bg-[#f8e9df] text-[#9e3708]",
     navy: "bg-night text-white",
   };
   return (
@@ -215,13 +215,13 @@ export function Breadcrumb({ items }: { items: { href: string; label: string }[]
 
 export function FaqList({ items }: { items: { question: string; answer: string }[] }) {
   return (
-    <div className="divide-y divide-line rounded-3xl border border-line bg-white">
+    <div className="divide-y divide-line border-y border-line bg-white">
       {items.map((item) => (
-        <details key={item.question} className="group px-6 py-5">
+        <details key={item.question} className="group px-1 py-6">
           <summary className="cursor-pointer list-none font-semibold text-night marker:content-none">
             <span className="flex items-start justify-between gap-4">
               {item.question}
-              <span className="mt-0.5 text-bright transition group-open:rotate-45">+</span>
+              <span className="mt-0.5 text-bright transition group-open:rotate-45 text-xl">+</span>
             </span>
           </summary>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">{item.answer}</p>

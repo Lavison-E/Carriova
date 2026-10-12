@@ -1,5 +1,3 @@
-import { cn } from "@/components/ui/primitives";
-
 const documentSections = {
   cv: [
     { title: "Profil", text: "Votre métier, votre expertise et le poste que vous visez." },
@@ -16,35 +14,34 @@ const documentSections = {
 export function DocumentPreview({ variant }: { variant: "cv" | "letter" }) {
   const isCv = variant === "cv";
   return (
-    <figure className="relative overflow-hidden rounded-[2rem] border border-line bg-[#e9effb] px-6 pb-6 pt-8 sm:px-10 sm:pt-10">
-      <div aria-hidden="true" className="absolute -right-12 -top-12 h-48 w-48 rounded-full border-[36px] border-bright/10" />
-      <div className="relative mx-auto max-w-sm rounded-t-2xl border border-line bg-white p-6 shadow-lift sm:p-8">
-        <div className="flex items-center justify-between gap-4 border-b border-line pb-5">
+    <figure className="overflow-hidden rounded-xl border border-night/10 bg-[#ebe6dc] px-5 pb-5 pt-6 sm:px-9 sm:pt-9">
+      <div className="mb-5 flex items-center justify-between gap-4 text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-muted">
+        <span>Le fond et la forme</span>
+        <span>{isCv ? "Document 01" : "Document 02"}</span>
+      </div>
+      <div className="mx-auto max-w-sm border border-night/15 bg-[#fffefa] p-6 sm:p-8">
+        <div className="flex items-center justify-between gap-4 border-b border-night/20 pb-5">
           <span className="text-[0.65rem] font-extrabold tracking-[0.16em] text-night">CARRIOVA</span>
-          <span className="rounded-full bg-soft px-2.5 py-1 text-[0.65rem] font-semibold text-royal">
-            {isCv ? "CV" : "LETTRE"}
-          </span>
+          <span className="text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[#bd470d]">{isCv ? "Curriculum vitæ" : "Lettre de motivation"}</span>
         </div>
-        <p className="mt-6 text-xl font-extrabold tracking-tight text-night">
+        <p className="font-editorial mt-7 text-3xl font-normal italic leading-tight text-night">
           {isCv ? "Votre prochain chapitre." : "Une candidature qui vous ressemble."}
         </p>
-        <p className="mt-2 text-xs leading-5 text-muted">
-          {isCv ? "Un parcours lisible. Des preuves à l’appui." : "Votre profil, relié à une opportunité précise."}
-        </p>
-        <div className="mt-6 space-y-5">
+        <p className="mt-3 text-xs leading-5 text-muted">{isCv ? "Un parcours lisible. Des preuves à l’appui." : "Votre profil, relié à une opportunité précise."}</p>
+        <div className="mt-7 space-y-5">
           {documentSections[variant].map((section, index) => (
-            <div key={section.title} className={cn("border-l-2 pl-3", index === 1 ? "border-orange" : "border-bright/25")}>
-              <p className="text-xs font-bold text-night">{section.title}</p>
-              <p className="mt-1 text-xs leading-5 text-muted">{section.text}</p>
+            <div key={section.title} className="grid grid-cols-[1.25rem_1fr] gap-2 border-t border-night/10 pt-4">
+              <span aria-hidden="true" className="pt-0.5 text-[0.6rem] text-[#bd470d]">0{index + 1}</span>
+              <div>
+                <p className="text-xs font-bold text-night">{section.title}</p>
+                <p className="mt-1 text-xs leading-5 text-muted">{section.text}</p>
+              </div>
             </div>
           ))}
         </div>
-        <div className="mt-7 flex items-center gap-2 border-t border-line pt-4 text-[0.65rem] font-semibold text-royal">
-          <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full bg-soft">✓</span>
-          Clair, personnel et adapté à votre objectif
-        </div>
+        <p className="mt-7 border-t border-night/20 pt-4 text-[0.6rem] font-medium leading-5 text-[#bd470d]">Clair, personnel et adapté à votre objectif.</p>
       </div>
-      <figcaption className="relative mt-4 text-center text-xs font-medium text-muted">
+      <figcaption className="mt-4 text-center text-[0.65rem] leading-5 text-muted">
         {isCv ? "Exemple de structure de CV" : "Les trois intentions d’une lettre utile"}
       </figcaption>
     </figure>
@@ -59,27 +56,21 @@ const careerStages = [
 
 export function CareerPathVisual() {
   return (
-    <figure className="relative overflow-hidden rounded-[2rem] bg-night p-7 text-white sm:p-10">
-      <div aria-hidden="true" className="absolute -right-20 -top-20 h-72 w-72 rounded-full border-[50px] border-white/5" />
-      <p className="relative text-xs font-semibold uppercase tracking-[0.18em] text-gold">Votre avenir prend forme</p>
-      <p className="relative mt-4 max-w-xs text-3xl font-extrabold leading-tight tracking-tight">Un potentiel.<br />Un chemin à construire.</p>
-      <ol className="relative mt-9 space-y-6">
+    <figure className="rounded-xl border border-night/10 bg-[#ebe6dc] p-7 text-night sm:p-10">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-[#bd470d]">Votre avenir prend forme</p>
+      <p className="font-editorial mt-5 text-5xl font-normal italic leading-[1.05]">Un potentiel.<br />Un chemin à construire.</p>
+      <ol className="mt-9">
         {careerStages.map((stage, index) => (
-          <li key={stage.title} className="relative flex gap-4">
-            {index < careerStages.length - 1 ? <span aria-hidden="true" className="absolute left-[19px] top-11 h-full w-px bg-white/20" /> : null}
-            <span aria-hidden="true" className={cn("relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold", index === 2 ? "bg-gold text-night" : "border border-white/25 bg-white/10 text-white")}>
-              0{index + 1}
-            </span>
-            <div className="pt-0.5">
-              <p className="text-sm font-bold">{stage.title}</p>
-              <p className="mt-1 text-xs leading-5 text-white/70">{stage.text}</p>
+          <li key={stage.title} className="grid grid-cols-[2rem_1fr] gap-4 border-t border-night/20 py-5">
+            <span aria-hidden="true" className="pt-0.5 text-xs font-semibold text-[#bd470d]">0{index + 1}</span>
+            <div>
+              <p className="text-sm font-semibold">{stage.title}</p>
+              <p className="mt-1 text-xs leading-5 text-muted">{stage.text}</p>
             </div>
           </li>
         ))}
       </ol>
-      <figcaption className="relative mt-8 border-t border-white/15 pt-5 text-xs leading-5 text-white/70">
-        La méthode CARRIOVA, à chaque étape de votre carrière.
-      </figcaption>
+      <figcaption className="mt-2 border-t border-night/20 pt-5 text-xs leading-6 text-muted">La méthode CARRIOVA, à chaque étape de votre carrière.</figcaption>
     </figure>
   );
 }
