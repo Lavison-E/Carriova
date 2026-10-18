@@ -1,7 +1,7 @@
 "use server";
 
 import { createHash } from "node:crypto";
-import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db";
@@ -123,24 +123,61 @@ export async function uploadRequestFile(_prev: ActionState, fd: FormData): Promi
     const kind = text(fd, "kind");
     if (kind !== "brief" && kind !== "delivery") return failure("Choisissez un type de document valide.");
     if (kind === "delivery" && actor.type !== "staff") return failure("Seule l’équipe peut déposer une livraison.");
+    const expectedVersion = kind === "delivery" ? versionOf(fd) : null;
     const value = fd.get("file");
     if (!value || typeof value === "string") return failure("Choisissez un fichier.", { file: "Un fichier est requis." });
     await getDb().transaction(async (tx) => {
       const current = await lockedRequest(tx, id, actor);
+      if (expectedVersion !== null) checkVersion(current.version, expectedVersion);
       requireOpen(current.status);
       if (kind === "delivery" && !["in_progress", "revision_requested"].includes(current.status)) throw new WorkspaceError("La demande doit être en cours pour préparer sa livraison.");
-      const [existing] = await tx.select({ total: count() }).from(requestFiles).where(eq(requestFiles.requestId, id));
-      if (existing.total >= WORKSPACE_MAX_FILES) throw new WorkspaceError("La demande contient déjà le maximum de 12 fichiers.");
+      const [existing] = await tx.select({ total: count() }).from(requestFiles).where(and(eq(requestFiles.requestId, id), eq(requestFiles.kind, kind)));
+      if (existing.total >= WORKSPACE_MAX_FILES) throw new WorkspaceError(kind === "delivery"
+        ? `Cette demande contient déjà le maximum de ${WORKSPACE_MAX_FILES} fichiers de livraison.`
+        : `Cette demande contient déjà le maximum de ${WORKSPACE_MAX_FILES} documents initiaux.`);
       await customerQuota(tx, actor, "uploads", 24, 86400, "Vous avez atteint la limite de 24 fichiers déposés sur 24 heures. Patientez avant d’ajouter un document.");
       // Ownership and count are checked under the same lock before reading or persisting bytes.
       const file = await validateWorkspaceFile(value);
       await tx.insert(requestFiles).values({ ...file, requestId: id, kind, uploadedByType: actor.type, uploadedById: actor.id, uploadedByName: actor.name, createdAt: new Date() });
       if (kind === "brief") await tx.insert(requestEvents).values({ requestId: id, type: "file_added", actorName: actor.name, body: `Document ajouté : ${file.filename}`, createdAt: new Date() });
-      await tx.update(serviceRequests).set({ updatedAt: new Date() }).where(eq(serviceRequests.id, id));
+      // A publisher must review the current set of drafts, including uploads from another staff member.
+      await tx.update(serviceRequests).set({ updatedAt: new Date(), ...(kind === "delivery" ? { version: current.version + 1 } : {}) }).where(eq(serviceRequests.id, id));
     });
     invalidate(id);
-    return { ok: true, message: kind === "delivery" ? "Fichier de livraison préparé. Passez la demande en « Livraison disponible » pour le rendre accessible au client." : "Votre document a été ajouté." };
+    return { ok: true, message: kind === "delivery" ? "Fichier de livraison préparé. Publiez la livraison pour le rendre accessible au client." : "Votre document a été ajouté." };
   });
+}
+
+type StaffRequestUpdate = {
+  version: number;
+  status: WorkspaceStatus;
+  quotedAmount: number | null;
+  dueAt: Date | null;
+  note: string;
+};
+
+async function saveStaffRequestUpdate(tx: Transaction, actor: Actor, current: typeof serviceRequests.$inferSelect, changes: StaffRequestUpdate) {
+  const { version, status, quotedAmount, dueAt, note } = changes;
+  const id = current.id;
+  checkVersion(current.version, version);
+  requireOpen(current.status);
+  if (status !== current.status && !staffRequestTransitions[current.status].includes(status)) throw new WorkspaceError("Cette transition n’est pas autorisée. L’acceptation du devis et la validation de livraison appartiennent au client.");
+  if (status === "quoted" && quotedAmount === null) throw new WorkspaceError("Indiquez le prix proposé avant d’envoyer la proposition, y compris 0 pour une prestation offerte.");
+  if (!["received", "reviewing", "quoted"].includes(current.status) && quotedAmount !== current.quotedAmount) throw new WorkspaceError("Le prix accepté par le client ne peut plus être modifié.");
+  if (status === "delivered" && current.status !== "delivered") {
+    const [revision] = await tx.select({ createdAt: requestEvents.createdAt }).from(requestEvents)
+      .where(and(eq(requestEvents.requestId, id), eq(requestEvents.type, "revision_requested"))).orderBy(desc(requestEvents.id)).limit(1);
+    const [delivery] = await tx.select({ id: requestFiles.id }).from(requestFiles)
+      .where(and(eq(requestFiles.requestId, id), eq(requestFiles.kind, "delivery"), revision ? gt(requestFiles.createdAt, revision.createdAt) : undefined)).limit(1);
+    if (!delivery) throw new WorkspaceError(revision ? "Ajoutez un nouveau fichier pour livrer cette révision." : "Ajoutez un fichier de livraison avant de marquer la demande comme livrée.");
+  }
+  const now = new Date();
+  const [updated] = await tx.update(serviceRequests).set({ status, quotedAmount, dueAt, version: version + 1, updatedAt: now })
+    .where(and(eq(serviceRequests.id, id), eq(serviceRequests.version, version))).returning({ id: serviceRequests.id });
+  if (!updated) throw new WorkspaceError("Cette demande a changé. Rechargez la page.");
+  const description = status === "quoted" ? `Proposition : ${quotedAmount === 0 ? "prestation offerte" : `${quotedAmount} FCFA (XOF)`}. Votre acceptation est attendue ; aucun paiement n’est enregistré ici.` : `Suivi mis à jour : ${workspaceStatusLabel(status)}.`;
+  await tx.insert(requestEvents).values({ requestId: id, type: status !== current.status ? status : "updated", actorName: actor.name, body: description, status, createdAt: now });
+  if (note) await message(tx, id, actor, note);
 }
 
 export async function updateServiceRequest(_prev: ActionState, fd: FormData): Promise<ActionState> {
@@ -162,28 +199,55 @@ export async function updateServiceRequest(_prev: ActionState, fd: FormData): Pr
     if (Object.keys(fieldErrors).length) return failure("Vérifiez les champs indiqués.", fieldErrors);
     await getDb().transaction(async (tx) => {
       const current = await lockedRequest(tx, id, actor);
-      checkVersion(current.version, version);
-      requireOpen(current.status);
-      if (status !== current.status && !staffRequestTransitions[current.status].includes(status)) throw new WorkspaceError("Cette transition n’est pas autorisée. L’acceptation du devis et la validation de livraison appartiennent au client.");
-      if (status === "quoted" && quotedAmount === null) throw new WorkspaceError("Indiquez le prix proposé avant d’envoyer la proposition, y compris 0 pour une prestation offerte.");
-      if (!["received", "reviewing", "quoted"].includes(current.status) && quotedAmount !== current.quotedAmount) throw new WorkspaceError("Le prix accepté par le client ne peut plus être modifié.");
-      if (status === "delivered" && current.status !== "delivered") {
-        const [revision] = await tx.select({ createdAt: requestEvents.createdAt }).from(requestEvents)
-          .where(and(eq(requestEvents.requestId, id), eq(requestEvents.type, "revision_requested"))).orderBy(desc(requestEvents.id)).limit(1);
-        const [delivery] = await tx.select({ id: requestFiles.id }).from(requestFiles)
-          .where(and(eq(requestFiles.requestId, id), eq(requestFiles.kind, "delivery"), revision ? gte(requestFiles.createdAt, revision.createdAt) : undefined)).limit(1);
-        if (!delivery) throw new WorkspaceError(revision ? "Ajoutez un nouveau fichier pour livrer cette révision." : "Ajoutez un fichier de livraison avant de marquer la demande comme livrée.");
-      }
-      const now = new Date();
-      const [updated] = await tx.update(serviceRequests).set({ status, quotedAmount, dueAt, version: version + 1, updatedAt: now })
-        .where(and(eq(serviceRequests.id, id), eq(serviceRequests.version, version))).returning({ id: serviceRequests.id });
-      if (!updated) throw new WorkspaceError("Cette demande a changé. Rechargez la page.");
-      const description = status === "quoted" ? `Proposition : ${quotedAmount === 0 ? "prestation offerte" : `${quotedAmount} FCFA (XOF)`}. Votre acceptation est attendue ; aucun paiement n’est enregistré ici.` : `Suivi mis à jour : ${workspaceStatusLabel(status)}.`;
-      await tx.insert(requestEvents).values({ requestId: id, type: status !== current.status ? status : "updated", actorName: actor.name, body: description, status, createdAt: now });
-      if (note) await message(tx, id, actor, note);
+      await saveStaffRequestUpdate(tx, actor, current, { version, status, quotedAmount, dueAt, note });
     });
     invalidate(id);
     return { ok: true, message: "La demande a été mise à jour. Les informations et la note sont visibles par le client." };
+  });
+}
+
+export async function publishRequestDelivery(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return asActor("team", async (actor) => {
+    const id = requestId(fd);
+    const version = versionOf(fd);
+    const note = text(fd, "note");
+    if (note.length > 5000) return failure("Vérifiez la note de livraison.", { note: "Limitez la note à 5 000 caractères." });
+    await getDb().transaction(async (tx) => {
+      const current = await lockedRequest(tx, id, actor);
+      if (current.status !== "in_progress" && current.status !== "revision_requested") throw new WorkspaceError("La demande doit être en cours ou en révision pour publier une livraison.");
+      await saveStaffRequestUpdate(tx, actor, current, {
+        version, status: "delivered", quotedAmount: current.quotedAmount, dueAt: current.dueAt, note,
+      });
+    });
+    invalidate(id);
+    return { ok: true, message: "La livraison a été publiée. Le client peut maintenant consulter ses documents et votre note." };
+  });
+}
+
+export async function removeDraftDelivery(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return asActor("team", async (actor) => {
+    const id = requestId(fd);
+    const version = versionOf(fd);
+    const rawFileId = text(fd, "fileId");
+    const fileId = Number(rawFileId);
+    if (!/^[1-9]\d*$/.test(rawFileId) || !Number.isSafeInteger(fileId)) return failure("Document introuvable.");
+    await getDb().transaction(async (tx) => {
+      const current = await lockedRequest(tx, id, actor);
+      checkVersion(current.version, version);
+      if (current.status !== "in_progress" && current.status !== "revision_requested") throw new WorkspaceError("Seuls les brouillons d’une demande en cours ou en révision peuvent être retirés.");
+      const scope = and(eq(requestFiles.id, fileId), eq(requestFiles.requestId, id), eq(requestFiles.kind, "delivery"));
+      const [file] = await tx.select({ createdAt: requestFiles.createdAt }).from(requestFiles).where(scope).limit(1);
+      if (!file) throw new WorkspaceError("Brouillon de livraison introuvable.");
+      const [publication] = await tx.select({ id: requestEvents.id }).from(requestEvents)
+        .where(and(eq(requestEvents.requestId, id), eq(requestEvents.type, "delivered"), gte(requestEvents.createdAt, file.createdAt))).limit(1);
+      if (publication) throw new WorkspaceError("Ce document a déjà été publié et ne peut plus être retiré.");
+      await tx.delete(requestFiles).where(scope);
+      const [updated] = await tx.update(serviceRequests).set({ version: version + 1, updatedAt: new Date() })
+        .where(and(eq(serviceRequests.id, id), eq(serviceRequests.version, version))).returning({ id: serviceRequests.id });
+      if (!updated) throw new WorkspaceError("Cette demande a changé. Rechargez la page.");
+    });
+    invalidate(id);
+    return { ok: true, message: "Le brouillon a été retiré de la préparation." };
   });
 }
 

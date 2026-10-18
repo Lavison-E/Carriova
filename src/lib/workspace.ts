@@ -16,6 +16,7 @@ export type WorkspaceFileKind = "brief" | "delivery";
 export type WorkspaceContext = "customer" | "team";
 export type CustomerRequestAction = "accept_quote" | "request_revision" | "complete";
 export const WORKSPACE_MAX_FILE_BYTES = 3 * 1024 * 1024;
+// Per request AND per kind: brief and delivery have independent allowances.
 export const WORKSPACE_MAX_FILES = 12;
 export const WORKSPACE_FILE_ACCEPT = ".pdf,.docx,.jpg,.jpeg,.png";
 

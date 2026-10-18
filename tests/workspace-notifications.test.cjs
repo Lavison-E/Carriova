@@ -161,4 +161,54 @@ test("transactional workspace email outbox", async (t) => {
     const rows = (await pg.query("SELECT status,last_error FROM workspace_notifications WHERE request_id=$1", [result.requestId])).rows;
     assert.equal(rows.length, 2); assert.ok(rows.every((row) => row.status === "pending" && row.last_error === "NETWORK_ERROR"));
   });
+  await t.test("publishing the final product queues real delivery triggers and provider failure preserves customer downloads", async () => {
+    const deliveryCommon = { ...common,
+      "@/lib/workspace": workspace,
+      "@/lib/customer-auth": { CustomerUnauthorizedError, requireCustomer: async () => ({ id: 1, name: "Existing customer" }) },
+    };
+    const files = load("src/lib/workspace-files.ts", deliveryCommon);
+    const actions = load("src/lib/workspace-actions.ts", { ...deliveryCommon,
+      "@/lib/workspace-mail": mail, "@/lib/workspace-files": files,
+      "next/cache": { revalidatePath() {} }, "next/navigation": { redirect: (path) => { throw new Error(`Redirect:${path}`); } },
+    });
+    const saved = (await pg.query("INSERT INTO service_requests(customer_id,title,service,brief,status,quoted_amount) VALUES(1,'Private delivery title','first_cv','Private brief','in_progress',12000) RETURNING id,version")).rows[0];
+    const content = Buffer.from("%PDF-1.4\nPrivate final product\n%%EOF\n");
+    const [document] = await db.insert(workspaceSchema.requestFiles).values({
+      requestId: saved.id, filename: "Private-final-product.pdf", mimeType: "application/pdf", size: content.length, content,
+      kind: "delivery", uploadedByType: "staff", uploadedById: 3, uploadedByName: "Staff", createdAt: new Date(Date.now() - 1000),
+    }).returning({ id: workspaceSchema.requestFiles.id });
+    assert.equal(await files.getWorkspaceFile(document.id), null, "The prepared product is not downloadable before publication");
+    const fd = new FormData(); fd.set("requestId", String(saved.id)); fd.set("version", String(saved.version)); fd.set("note", "Private final product note");
+    const before = outgoing.length;
+    assert.equal(scheduled.length, 0);
+    const result = await actions.publishRequestDelivery({ ok: false, message: "" }, fd);
+    assert.equal(result.ok, true);
+    assert.equal(outgoing.length, before, "Publication commits before any provider call");
+    assert.equal(scheduled.length, 1);
+    const jobs = (await pg.query("SELECT kind,audience,customer_id,status,payload FROM workspace_notifications WHERE request_id=$1 ORDER BY kind", [saved.id])).rows;
+    assert.deepEqual(jobs, [
+      { kind: "delivered", audience: "customer", customer_id: 1, status: "pending", payload: null },
+      { kind: "message", audience: "customer", customer_id: 1, status: "pending", payload: null },
+    ], "The real SQL triggers enqueue delivery and its separate staff note for the request owner");
+    assert.deepEqual(Buffer.from((await files.getWorkspaceFile(document.id)).content), content);
+    assert.equal((await actions.publishRequestDelivery({ ok: false, message: "" }, fd)).ok, false, "A repeated publication cannot enqueue duplicate delivery mail");
+    assert.equal((await pg.query("SELECT count(*)::integer AS n FROM workspace_notifications WHERE request_id=$1", [saved.id])).rows[0].n, 2);
+    assert.equal(scheduled.length, 1);
+    mode = "reject";
+    await scheduled.shift()();
+    assert.equal(outgoing.length, before + 2);
+    for (const call of outgoing.slice(before)) {
+      assert.deepEqual(call.payload.to, ["old@example.test"]);
+      assert.ok(call.payload.text.includes(`${env.NEXT_PUBLIC_SITE_URL}/espace/demandes/${saved.id}`));
+      assert.equal(JSON.stringify(call.payload).includes("Private"), false);
+      assert.equal("attachments" in call.payload, false);
+    }
+    const pending = (await pg.query("SELECT kind,status,last_error FROM workspace_notifications WHERE request_id=$1 ORDER BY kind", [saved.id])).rows;
+    assert.deepEqual(pending, [
+      { kind: "delivered", status: "pending", last_error: "HTTP_503" },
+      { kind: "message", status: "pending", last_error: "HTTP_503" },
+    ]);
+    assert.equal((await pg.query("SELECT status FROM service_requests WHERE id=$1", [saved.id])).rows[0].status, "delivered");
+    assert.deepEqual(Buffer.from((await files.getWorkspaceFile(document.id)).content), content, "Provider failure leaves the published product downloadable by its owner");
+  });
 });

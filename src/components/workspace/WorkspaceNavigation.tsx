@@ -6,7 +6,7 @@ import { CareerIcon, type CareerIconName } from "@/components/brand/CareerIcon";
 const links: { href: string; label: string; short: string; icon: CareerIconName }[] = [
   { href: "/espace", label: "Vue d’ensemble", short: "Accueil", icon: "compass" },
   { href: "/espace/demandes", label: "Mes demandes", short: "Demandes", icon: "briefcase" },
-  { href: "/espace/documents", label: "Mes documents", short: "Documents", icon: "document" },
+  { href: "/espace/documents", label: "Produits & documents", short: "Produits", icon: "document" },
   { href: "/espace/compte", label: "Mon compte", short: "Compte", icon: "people" },
 ];
 
