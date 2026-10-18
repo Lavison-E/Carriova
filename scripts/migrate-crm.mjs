@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createClient, safeDatabaseError } from "./database.mjs";
 
-const migrations = ["20261018_staff.sql", "20261018_crm.sql"];
+const migrations = ["20261018_staff.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261018_staff_invites.sql", "20261018_notifications.sql"];
 export async function migrateCrm(client) {
   await client.query("BEGIN");
   try {

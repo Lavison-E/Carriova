@@ -75,7 +75,7 @@ Ouvrez [http://localhost:3000](http://localhost:3000).
 
 Sans `DATABASE_URL`, les pages de présentation restent consultables avec des listes de contenu vides. Les formulaires ne prétendent pas enregistrer de demandes et `/api/health` renvoie HTTP 503. Une base configurée mais inaccessible reste une erreur explicite.
 
-L’inscription enregistre une demande d’accompagnement. L’espace personnel et la connexion authentifiée ne sont pas encore disponibles.
+Les comptes clients sont actifs : inscription à `/compte/creer`, connexion à `/compte/connexion`, puis suivi dans `/espace`. Les clients créent leurs demandes, échangent avec l’équipe, consultent les propositions et téléchargent leurs documents privés. L’équipe traite ces demandes dans `/admin/commandes`. Les comptes client et équipe sont distincts. La configuration des migrations, des premiers accès et de la récupération de mot de passe est détaillée dans [le guide CRM et espace client](docs/CRM-setup.md).
 
 ## Commandes disponibles
 
@@ -101,6 +101,7 @@ Intégrations activables selon les besoins :
 - API d’administration des leads protégée par un jeton.
 
 Les paramètres requis, règles de validation et comportements lorsque ces variables sont absentes sont documentés dans `.env.example` et validés côté serveur.
+`EMAIL_FROM` conserve l’expéditeur des notifications historiques des formulaires publics. `EMAIL_TRANSACTIONAL_FROM` définit l’expéditeur des nouveaux e-mails de compte, de récupération et de suivi ; sa valeur par défaut est `CARRIOVA <noreply@carriovaci.com>`, sur un domaine à vérifier auprès de Resend. `SUPPORT_EMAIL` désigne la boîte destinataire des questions et des réponses des clients ; si cette valeur est vide, le service utilise `CONTACT_EMAIL`. La configuration ne crée aucune boîte mail : l’adresse de support doit exister et être réellement suivie. Les clés Resend et les accès PostgreSQL restent exclusivement dans la configuration serveur.
 
 ## Données et contenu
 

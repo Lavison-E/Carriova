@@ -1,11 +1,15 @@
 "use server";
 
-import { createHash } from "node:crypto";
-import { headers } from "next/headers";
+import { createHash, randomBytes } from "node:crypto";
+import { cookies, headers } from "next/headers";
 import { lt, lte, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
+import { customerLeadClaims } from "@/db/customer-schema";
+import { CLAIM_COOKIE, customerTokenHash, getCustomerSession } from "@/lib/customer-auth";
+import { attachLeadToCustomer } from "@/lib/customer-claims";
 import { leads } from "@/db/schema";
 import { crmHistory, crmLeadState, crmSubmissionLimits, qualifications } from "@/db/crm-schema";
+import { scheduleWorkspaceNotifications } from "@/lib/workspace-mail";
 import type { ActionState } from "@/lib/actions";
 import { QUALIFICATION_CONSENT_VERSION, QUALIFICATION_PRIVACY_NOTICE, qualificationLabel, validateQualification } from "@/lib/qualification";
 
@@ -20,6 +24,8 @@ export async function submitQualification(_prev: ActionState, formData: FormData
   }
   const data = validation.data;
   try {
+    const customer = await getCustomerSession();
+    const claimToken = customer ? null : randomBytes(32).toString("base64url");
     const headerList = await headers();
     const address = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() || headerList.get("x-real-ip") || "unknown";
     const key = `qualification:${createHash("sha256").update(address).digest("hex")}`;
@@ -73,8 +79,12 @@ export async function submitQualification(_prev: ActionState, formData: FormData
         leadId: lead.id, action: "qualification_submitted", status: "new",
         changes: { source: "/qualification", consentVersion: QUALIFICATION_CONSENT_VERSION },
       });
+      if (customer) await attachLeadToCustomer(tx, lead.id, customer);
+      else if (claimToken) await tx.insert(customerLeadClaims).values({ tokenHash: customerTokenHash(claimToken), leadId: lead.id, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) });
     });
-    // Aucun message externe ni transfert CRM tiers n’est déclenché par cette qualification.
+    if (claimToken) (await cookies()).set(CLAIM_COOKIE, claimToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 7 * 24 * 60 * 60 });
+    // Seul le compte déjà authentifié reçoit les notifications de son espace ; aucun WhatsApp ni webhook CRM tiers.
+    if (customer) scheduleWorkspaceNotifications({ customerId: customer.id });
     return { ok: true, message: "Votre demande a bien été enregistrée. L’équipe CARRIOVA l’étudiera en respectant vos préférences de contact." };
   } catch {
     return { ok: false, message: "Le service est temporairement indisponible. Votre demande n’a pas pu être enregistrée. Réessayez dans un instant." };

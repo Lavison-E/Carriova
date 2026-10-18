@@ -4,7 +4,7 @@ import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
   title: "Conditions d’utilisation",
-  description: "Conditions d’utilisation du site public CARRIOVA.",
+  description: "Conditions d’utilisation du site et de l’espace client CARRIOVA.",
   path: "/legal/conditions",
 });
 
@@ -14,7 +14,7 @@ export default function TermsPage() {
       <PageHero
         eyebrow="Légal"
         title="Conditions d’utilisation"
-        text="Le site public présente l’écosystème CARRIOVA et collecte des demandes. Il n’est pas l’application authentifiée."
+        text="CARRIOVA présente ses accompagnements et donne accès à un espace personnel pour créer et suivre vos demandes."
         crumbs={[
           { href: "/", label: "Accueil" },
           { href: "/legal/conditions", label: "Conditions" },
@@ -31,8 +31,9 @@ export default function TermsPage() {
             ne constituent pas une offre d’embauche de CARRIOVA, sauf mention contraire.
           </p>
           <p>
-            Les tarifs affichés comme « sur devis » n’engagent pas un prix. Un devis ou un contrat
-            distinct encadrera toute prestation payante.
+            Les tarifs affichés comme « sur devis » n’engagent pas un prix. Toute prestation payante
+            fait l’objet d’un devis ou d’un contrat distinct. L’acceptation d’une proposition dans
+            l’espace client ne déclenche aucun paiement et ne constitue pas un reçu de paiement.
           </p>
         </div>
       </Section>

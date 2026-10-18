@@ -194,7 +194,7 @@ export function QualificationForm() {
         <h2 ref={successRef} tabIndex={-1} className="mt-4 scroll-mt-28 text-3xl font-semibold tracking-tight text-night outline-none sm:text-4xl">Merci pour votre confiance !</h2>
         <p className="mt-5 max-w-xl text-base leading-8 text-muted">Votre demande a bien été reçue. L’équipe Carriova pourra étudier votre besoin et vous recontacter si vous avez demandé un échange.</p>
         <p className="mt-6 font-editorial text-2xl italic text-night">Révélez votre potentiel. Boostez votre carrière.</p>
-        <div className="mt-9 flex flex-col gap-3 sm:flex-row"><ButtonLink href="/solutions" variant="orange">Explorer les solutions <CareerIcon name="arrow" className="h-4 w-4" /></ButtonLink><ButtonLink href="/" variant="secondary">Retour à l’accueil</ButtonLink></div>
+        <div className="mt-9 flex flex-col flex-wrap gap-3 sm:flex-row"><ButtonLink href="/compte/creer" variant="orange">Créer mon espace et suivre ma demande <CareerIcon name="arrow" className="h-4 w-4" /></ButtonLink><ButtonLink href="/" variant="secondary">Retour à l’accueil</ButtonLink></div>
       </div>
     );
   }

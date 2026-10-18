@@ -17,6 +17,7 @@ export type ActionState = {
   ok: boolean;
   message: string;
   fieldErrors?: Record<string, string>;
+  requestId?: number;
 };
 
 async function clientKey(scope: string) {

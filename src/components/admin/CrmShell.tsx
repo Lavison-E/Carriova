@@ -6,12 +6,14 @@ import { crmStatusOptions, type CrmStatus } from "@/lib/crm";
 import type { StaffIdentity } from "@/lib/staff-auth";
 import { staffLogout } from "@/lib/staff-actions";
 
-export function CrmShell({ user, children, title, description, back }: {
+export function CrmShell({ user, children, title, description, back, action, section = "prospects" }: {
   user: StaffIdentity | null;
   children: ReactNode;
   title: string;
   description?: string;
   back?: boolean;
+  action?: ReactNode;
+  section?: "prospects" | "orders" | "notifications";
 }) {
   return (
     <div className="min-h-screen bg-paper text-night">
@@ -23,14 +25,19 @@ export function CrmShell({ user, children, title, description, back }: {
           ) : <Link href="/admin/connexion" className="min-h-10 py-3 text-xs font-medium text-white/80 hover:text-white">Connexion équipe</Link>}
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8 lg:px-12 lg:pt-10">
-        <nav aria-label="Navigation CRM" className="mb-8 flex items-center justify-between gap-4 border-b border-night/15 pb-5 text-xs">
-          <Link href="/admin/crm" className="inline-flex min-h-9 items-center gap-2 font-semibold text-night hover:text-orange">{back ? <CareerIcon name="arrow" className="h-4 w-4 rotate-180" /> : <CareerIcon name="people" className="h-4 w-4" />}{back ? "Retour aux prospects" : "Prospects & suivi"}</Link>
+      <div className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8 lg:px-12 lg:pt-10">
+        <nav aria-label="Navigation équipe" className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-night/15 pb-5 text-xs">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Link href="/admin/crm" aria-current={section === "prospects" ? "page" : undefined} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 font-semibold ${section === "prospects" ? "bg-night text-white" : "text-muted hover:bg-white hover:text-night"}`}><CareerIcon name="people" className="h-4 w-4" />Prospects</Link>
+            <Link href="/admin/commandes" aria-current={section === "orders" ? "page" : undefined} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 font-semibold ${section === "orders" ? "bg-night text-white" : "text-muted hover:bg-white hover:text-night"}`}><CareerIcon name="briefcase" className="h-4 w-4" />Commandes</Link>
+            <Link href="/admin/notifications" aria-current={section === "notifications" ? "page" : undefined} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 font-semibold ${section === "notifications" ? "bg-night text-white" : "text-muted hover:bg-white hover:text-night"}`}>Notifications</Link>
+          </div>
           <Link href="/qualification" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-2 text-muted hover:text-night">Formulaire public <span aria-hidden="true">↗</span><span className="sr-only">(nouvel onglet)</span></Link>
         </nav>
-        <div className="mb-8"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-orange">CARRIOVA / Relation prospects</p><h1 className="mt-3 break-words font-editorial text-4xl italic leading-tight tracking-tight sm:text-5xl">{title}</h1>{description ? <p className="mt-4 max-w-3xl text-sm leading-7 text-muted">{description}</p> : null}</div>
+        {back ? <Link href={section === "orders" ? "/admin/commandes" : "/admin/crm"} className="mb-6 inline-flex min-h-9 items-center gap-2 text-xs font-medium text-muted hover:text-night"><CareerIcon name="arrow" className="h-4 w-4 rotate-180" />{section === "orders" ? "Retour aux commandes" : "Retour aux prospects"}</Link> : null}
+        <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-orange">CARRIOVA / {section === "orders" ? "Commandes & accompagnement" : section === "notifications" ? "Notifications" : "Relation prospects"}</p><h1 className="mt-3 break-words font-editorial text-4xl italic leading-tight tracking-tight sm:text-5xl">{title}</h1>{description ? <p className="mt-4 max-w-3xl text-sm leading-7 text-muted">{description}</p> : null}</div>{action}</div>
         {children}
-      </main>
+      </div>
       <footer className="mx-auto flex max-w-7xl flex-col gap-2 border-t border-night/10 px-5 py-6 text-[10px] leading-5 text-muted sm:flex-row sm:justify-between sm:px-8 lg:px-12"><p>CARRIOVA · Espace réservé à l’équipe</p><p>Horaires affichés en UTC · Abidjan</p></footer>
     </div>
   );

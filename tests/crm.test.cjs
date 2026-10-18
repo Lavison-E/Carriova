@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { createHash } = require("node:crypto");
 const { readFileSync } = require("node:fs");
 const { createRequire } = require("node:module");
 const { resolve } = require("node:path");
@@ -18,6 +19,7 @@ function load(file, mocks = {}) {
   return loaded.exports;
 }
 const schema = load("src/db/schema.ts");
+const customerSchema = load("src/db/customer-schema.ts", { "./schema": schema });
 const crmSchema = load("src/db/crm-schema.ts", { "./schema": schema });
 const qualification = load("src/lib/qualification.ts");
 const crm = load("src/lib/crm.ts");
@@ -54,12 +56,17 @@ function submission(respond) {
     if (sql.startsWith('insert into "leads"')) return [[7]];
     return [];
   }));
+  const cookieWrites = [];
   const action = load("src/lib/qualification-actions.ts", {
-    "next/headers": { headers: async () => new Headers({ "x-real-ip": "192.0.2.1" }) },
+    "next/headers": { headers: async () => new Headers({ "x-real-ip": "192.0.2.1" }), cookies: async () => ({ set: (...args) => cookieWrites.push(args) }) },
+    "@/db/customer-schema": customerSchema,
+    "@/lib/customer-auth": { getCustomerSession: async () => null, CLAIM_COOKIE: "test-claim", customerTokenHash: (value) => createHash("sha256").update(value).digest("hex") },
+    "@/lib/workspace-mail": { scheduleWorkspaceNotifications() {} },
+    "@/lib/customer-claims": { attachLeadToCustomer: async () => { throw new Error("unexpected authenticated claim"); } },
     "@/db": { getDb: () => fixture.db }, "@/db/schema": schema,
     "@/db/crm-schema": crmSchema, "@/lib/qualification": qualification,
   });
-  return { ...fixture, action: action.submitQualification };
+  return { ...fixture, cookieWrites, action: action.submitQualification };
 }
 function mutations({ currentVersion = 0, failHistory = false, actor = async () => staff } = {}) {
   const fixture = database((sql) => {
@@ -114,7 +121,7 @@ test("qualification bounds inputs and cannot accept a forged checkbox or unknown
   assert.equal(qualification.validateQualification(payload).ok, false);
 });
 
-test("public qualification writes lead, answers, state and history in one transaction without returning a record", async () => {
+test("public qualification writes lead, answers, state, history and claim in one transaction without returning a record", async () => {
   const fixture = submission();
   const result = await fixture.action(initial, data({ role: "admin", status: "client", sourceForm: "/forged", consentMarketing: "on" }));
   assert.equal(result.ok, true);
@@ -126,7 +133,14 @@ test("public qualification writes lead, answers, state and history in one transa
   assert.ok(sequence[2].startsWith('insert into "lead_qualifications"'));
   assert.ok(sequence[3].startsWith('insert into "crm_lead_state"'));
   assert.ok(sequence[4].startsWith('insert into "crm_history"'));
-  assert.equal(sequence[5], "commit");
+  assert.ok(sequence[5].startsWith('insert into "customer_lead_claims"'));
+  assert.equal(sequence[6], "commit");
+  assert.equal(fixture.cookieWrites.length, 1);
+  const token = fixture.cookieWrites[0][1];
+  assert.match(token, /^[A-Za-z0-9_-]{43}$/);
+  assert.ok(transaction[5].parameters.includes(createHash("sha256").update(token).digest("hex")));
+  assert.equal(transaction[5].parameters.includes(token), false);
+  assert.equal(fixture.cookieWrites[0][2].httpOnly, true);
   assert.ok(transaction[1].parameters.includes(""), "No email was requested: persist its documented absence");
   assert.ok(transaction[2].parameters.includes(false), "Refusal of WhatsApp contact must be stored");
   assert.ok(transaction[2].parameters.includes(qualification.QUALIFICATION_PRIVACY_NOTICE));

@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { createHash } = require("node:crypto");
 const { readFileSync } = require("node:fs");
 const { resolve } = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -8,6 +9,7 @@ const { drizzle } = require("drizzle-orm/pglite");
 const { CORE_LEADS_SQL, loadTypeScript, migrationClient } = require("./helpers/crm-fixture.cjs");
 
 const schema = loadTypeScript("src/db/schema.ts");
+const customerSchema = loadTypeScript("src/db/customer-schema.ts", { "./schema": schema });
 const crmSchema = loadTypeScript("src/db/crm-schema.ts", { "./schema": schema });
 const qualification = loadTypeScript("src/lib/qualification.ts");
 const crm = loadTypeScript("src/lib/crm.ts");
@@ -45,8 +47,13 @@ test("PostgreSQL CRM integration", async (t) => {
     "@/db/crm-schema": crmSchema, "@/lib/qualification": qualification, "@/lib/crm": crm,
     "@/lib/staff-auth": { requireStaff: async () => staff, UnauthorizedError },
   };
+  const cookieWrites = [];
   const { submitQualification } = loadTypeScript("src/lib/qualification-actions.ts", {
-    ...common, "next/headers": { headers: async () => new Headers({ "x-real-ip": ip }) },
+    ...common, "next/headers": { headers: async () => new Headers({ "x-real-ip": ip }), cookies: async () => ({ set: (...args) => cookieWrites.push(args) }) },
+    "@/db/customer-schema": customerSchema,
+    "@/lib/customer-auth": { getCustomerSession: async () => null, CLAIM_COOKIE: "test-claim", customerTokenHash: (value) => createHash("sha256").update(value).digest("hex") },
+    "@/lib/workspace-mail": { scheduleWorkspaceNotifications() {} },
+    "@/lib/customer-claims": { attachLeadToCustomer: async () => { throw new Error("unexpected authenticated claim"); } },
   });
   const invalidations = [];
   const { updateCrmLead } = loadTypeScript("src/lib/crm-actions.ts", {
@@ -68,7 +75,7 @@ test("PostgreSQL CRM integration", async (t) => {
     await pg.exec(CORE_LEADS_SQL);
     const inserted = await pg.query("INSERT INTO leads(first_name,last_name,email,type,whatsapp,source) VALUES ('Ancien','Prospect','old@example.test','contact','+2250100000000','website') RETURNING id");
     legacyId = inserted.rows[0].id;
-    assert.deepEqual(await migrateCrm(client), ["20261018_staff.sql", "20261018_crm.sql"]);
+    assert.deepEqual(await migrateCrm(client), ["20261018_staff.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261018_staff_invites.sql", "20261018_notifications.sql"]);
     assert.deepEqual(await migrateCrm(client), []);
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_crm.sql"), "utf8"));
     const { rows } = await pg.query("SELECT first_name,email FROM leads WHERE id=$1", [legacyId]);
@@ -84,7 +91,7 @@ test("PostgreSQL CRM integration", async (t) => {
     assert.equal(oldLead.canContactWhatsApp, false);
   });
 
-  await t.test("public submission commits all four records without fabricating email or contact consent", async () => {
+  await t.test("public submission commits all five records without fabricating email or contact consent", async () => {
     const result = await submitQualification(initial, form({ consentMarketing: "on" }));
     assert.equal(result.ok, true, result.message);
     assert.deepEqual(Object.keys(result).sort(), ["message", "ok"]);
@@ -98,6 +105,11 @@ test("PostgreSQL CRM integration", async (t) => {
     assert.equal(rows[0].consent_version, qualification.QUALIFICATION_CONSENT_VERSION);
     assert.equal(rows[0].status, "new");
     assert.equal(rows[0].action, "qualification_submitted");
+    const claim = await pg.query("SELECT token_hash,claimed_at,customer_id FROM customer_lead_claims WHERE lead_id=$1", [qualifiedLeadId]);
+    assert.equal(claim.rows.length, 1);
+    assert.equal(claim.rows[0].token_hash, createHash("sha256").update(cookieWrites.at(-1)[1]).digest("hex"));
+    assert.equal(claim.rows[0].claimed_at, null);
+    assert.equal(claim.rows[0].customer_id, null);
     const detail = await getCrmLead(qualifiedLeadId);
     assert.equal(detail.canContactWhatsApp, false);
     assert.equal(detail.qualification.contactWhatsApp, "no");
@@ -130,6 +142,17 @@ test("PostgreSQL CRM integration", async (t) => {
     } finally {
       await pg.exec("ALTER TABLE lead_qualifications DROP CONSTRAINT integration_reject_profile");
     }
+  });
+
+  await t.test("a failed opaque claim rolls back every qualification record and never sets a cookie", async () => {
+    const before = (await pg.query("SELECT count(*)::integer AS total FROM leads")).rows[0].total;
+    const cookiesBefore = cookieWrites.length;
+    await pg.exec("ALTER TABLE customer_lead_claims ADD CONSTRAINT integration_reject_claim CHECK (token_hash='impossible') NOT VALID");
+    try {
+      assert.equal((await submitQualification(initial, form({ fullName: "Rejected claim" }))).ok, false);
+      assert.equal((await pg.query("SELECT count(*)::integer AS total FROM leads")).rows[0].total, before);
+      assert.equal(cookieWrites.length, cookiesBefore);
+    } finally { await pg.exec("ALTER TABLE customer_lead_claims DROP CONSTRAINT integration_reject_claim"); }
   });
 
   await t.test("submission limiting purges windows older than 24 hours and retains recent counters", async () => {

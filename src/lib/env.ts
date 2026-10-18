@@ -32,11 +32,14 @@ export type ServerEnv = {
   DATABASE_URL: string;
   NEXT_PUBLIC_SITE_URL: string;
   CONTACT_EMAIL: string;
+  SUPPORT_EMAIL: string;
   isProduction: boolean;
   email: {
     enabled: boolean;
+    transactionalEnabled: boolean;
     apiKey: string;
     from: string;
+    transactionalFrom: string;
     notify: string[];
     baseUrl: string;
   };
@@ -120,9 +123,17 @@ function loadServerEnv(): { env: ServerEnv; issues: EnvIssue[] } {
     fail("CONTACT_EMAIL", `adresse invalide : repli sur ${DEFAULT_CONTACT_EMAIL}.`);
   }
 
+  const rawSupport = read("SUPPORT_EMAIL");
+  const supportValid = rawSupport !== "" && isEmail(rawSupport);
+  if (rawSupport && !supportValid) warn("SUPPORT_EMAIL", "adresse invalide : repli sur CONTACT_EMAIL.");
+
   // --- E-mails transactionnels (Resend) -------------------------------------
   const resendKey = read("RESEND_API_KEY");
   const emailFrom = read("EMAIL_FROM");
+  const rawTransactionalFrom = read("EMAIL_TRANSACTIONAL_FROM");
+  const transactionalFrom = rawTransactionalFrom || "CARRIOVA <noreply@carriovaci.com>";
+  const transactionalFromValid = isEmail(senderAddress(transactionalFrom));
+  if (!transactionalFromValid) fail("EMAIL_TRANSACTIONAL_FROM", "expéditeur invalide : notifications de compte désactivées.");
   const notifyRaw = read("LEAD_NOTIFICATION_EMAIL");
   const notifyList = notifyRaw
     .split(/[,;]/)
@@ -233,11 +244,14 @@ function loadServerEnv(): { env: ServerEnv; issues: EnvIssue[] } {
       DATABASE_URL: databaseUrl,
       NEXT_PUBLIC_SITE_URL: siteUrl ?? DEFAULT_SITE_URL,
       CONTACT_EMAIL: contactValid ? rawContact : DEFAULT_CONTACT_EMAIL,
+      SUPPORT_EMAIL: supportValid ? rawSupport : (contactValid ? rawContact : DEFAULT_CONTACT_EMAIL),
       isProduction,
       email: {
         enabled: emailEnabled,
+        transactionalEnabled: Boolean(resendKey && transactionalFromValid && resendBaseUrl),
         apiKey: resendKey,
         from: emailFrom,
+        transactionalFrom,
         notify: notifyValid ? notifyList : [],
         baseUrl: resendBaseUrl ?? DEFAULT_RESEND_BASE_URL,
       },

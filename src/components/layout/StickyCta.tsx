@@ -41,7 +41,7 @@ function ContextualStickyCta({ pathname }: { pathname: string }) {
     };
   }, [pathname]);
 
-  if (pathname.startsWith("/qualification") || pathname.startsWith("/compte") || pathname.startsWith("/contact") || pathname.startsWith("/admin") || pathname.startsWith("/solutions")) return null;
+  if (pathname.startsWith("/qualification") || pathname.startsWith("/compte") || pathname.startsWith("/contact") || pathname.startsWith("/support") || pathname.startsWith("/admin") || pathname.startsWith("/solutions")) return null;
   if (pathname === "/" && !heroPassed) return null;
 
   return (

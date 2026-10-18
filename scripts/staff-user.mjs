@@ -38,6 +38,7 @@ try {
       const result = await client.query(statement, command === "reset" ? [email, passwordHash] : [email]);
       user = result.rows[0];
       if (!user) throw Object.assign(new Error("Compte introuvable"), { code: "STAFF_NOT_FOUND" });
+      await client.query("DELETE FROM staff_invites WHERE user_id=$1", [user.id]);
       await client.query("DELETE FROM staff_sessions WHERE user_id=$1", [user.id]);
     }
     await client.query("COMMIT");

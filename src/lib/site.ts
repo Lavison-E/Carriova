@@ -358,6 +358,7 @@ export const footerGroups = [
       { href: "/guides", label: "Guides" },
       { href: "/conseils-carriere", label: "Conseils carrière" },
       { href: "/faq", label: "FAQ" },
+      { href: "/support", label: "Support" },
       { href: "/conseils-cv", label: "Conseils CV" },
     ],
   },

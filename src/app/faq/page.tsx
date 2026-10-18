@@ -13,7 +13,9 @@ export const metadata = buildMetadata({
 });
 
 export default async function FaqPage() {
-  const items = await getFaqs("global");
+  const items = (await getFaqs("global")).map((item) => item.answer === "En créant un compte. L’espace authentifié accueillera progressivement CV, lettres, demandes et préférences."
+    ? { ...item, answer: "Connectez-vous à votre espace CARRIOVA, puis ouvrez Mes documents. Vous y retrouvez les fichiers transmis pour vos demandes et les livrables partagés par l’équipe. Vous pouvez aussi les télécharger depuis le détail de chaque demande." }
+    : item);
   const crumbs = [
     { href: "/", label: "Accueil" },
     { href: "/faq", label: "FAQ" },
@@ -25,7 +27,7 @@ export default async function FaqPage() {
       <PageHero
         eyebrow="FAQ"
         title="Ce que l’on nous demande le plus souvent."
-        text="Des réponses sobres, éditables, sans statistiques inventées."
+        text="Des réponses pour comprendre nos accompagnements et utiliser votre espace."
         crumbs={crumbs}
       />
       <Section>
