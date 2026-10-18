@@ -10,7 +10,7 @@ import { catalogueOffers, qualificationRequestHref, serviceNeedForSlug, workspac
 export const dynamic = "force-dynamic";
 export const metadata = buildMetadata({
   title: "Tarifs et accompagnements",
-  description: "Premier CV, candidature ciblée, lettre, entretien ou coaching : choisissez votre accompagnement CARRIOVA et demandez une proposition adaptée à votre besoin.",
+  description: "Création de CV professionnel, CV Cleaning, candidature ciblée ou coaching : choisissez votre accompagnement CARRIOVA et demandez une proposition adaptée à votre besoin.",
   path: "/tarifs",
 });
 
