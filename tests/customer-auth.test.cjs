@@ -12,7 +12,7 @@ test("Customer accounts and pending-request ownership",async t=>{
  const customerSchema=load("src/db/customer-schema.ts",{"./schema":core});
  const crm=load("src/db/crm-schema.ts",{"./schema":core});
  const workspace=load("src/db/workspace-schema.ts",{"./schema":core,"./customer-schema":customerSchema});
- const qualification=load("src/lib/qualification.ts");
+ const qualification=load("src/lib/qualification.ts", { "@/lib/countries": load("src/lib/countries.ts") });
  const passwords=await import("../src/lib/staff-password.mjs");
  const values=new Map();let lastCookie;
  const jar={get:name=>values.has(name)?{value:values.get(name)}:undefined,set(name,value,options){values.set(name,value);lastCookie={name,value,options};}};
@@ -175,4 +175,38 @@ test("Customer accounts and pending-request ownership",async t=>{
   }
  });
 
+ await t.test("customer signup, change and reset accept eight characters and reject seven",async()=>{
+  const email="minimum-eight@example.test",short="Seven7!",initial="Client8!",changed="Change8!",reset="Reset88!";
+  const signupData={name:"Client minimum",email,password:short,confirmPassword:short,consentPrivacy:"on"};
+  const rejected=await actions.customerSignup({},fd(signupData));
+  assert.equal(rejected.ok,false);assert.ok(rejected.fieldErrors.password);
+  assert.equal((await pg.query("SELECT count(*)::int AS n FROM customer_users WHERE email=$1",[email])).rows[0].n,0);
+  values.clear();
+  await assert.rejects(actions.customerSignup({},fd({...signupData,password:initial,confirmPassword:initial})),Redirect);
+  const user=await auth.requireCustomer();
+  assert.equal((await actions.customerChangePassword({},fd({currentPassword:initial,newPassword:short,confirmPassword:short}))).ok,false);
+  assert.equal((await actions.customerChangePassword({},fd({currentPassword:initial,newPassword:changed,confirmPassword:changed}))).ok,true);
+  const recovery=await seedReset(user.id);
+  assert.equal((await actions.customerResetPassword({},fd({token:recovery,password:short,confirmPassword:short}))).ok,false);
+  assert.equal((await actions.customerResetPassword({},fd({token:recovery,password:reset,confirmPassword:reset}))).ok,true);
+  assert.deepEqual(await counts(user.id),{sessions:0,resets:0});
+  await assert.rejects(actions.customerLogin({},fd({email,password:reset})),Redirect);
+  assert.equal((await auth.requireCustomer()).id,user.id);
+ });
+
+});
+
+
+test("shared password hashing keeps staff at fifteen and uses the same KDF for eight-character customer passwords",async()=>{
+ const {hashPassword,verifyPassword}=await import("../src/lib/staff-password.mjs");
+ const password="Client8!";
+ await assert.rejects(hashPassword(password));
+ await assert.rejects(hashPassword("12345678901234"));
+ await assert.rejects(hashPassword("Seven7!",{minLength:8}));
+ await assert.rejects(hashPassword("x".repeat(257),{minLength:8}));
+ await assert.rejects(hashPassword(password,{minLength:1}));
+ const hash=await hashPassword(password,{minLength:8});
+ assert.match(hash,/^scrypt\$32768\$8\$3\$/);
+ assert.equal(await verifyPassword(password,hash),true);
+ assert.equal(await verifyPassword("Changed8",hash),false);
 });

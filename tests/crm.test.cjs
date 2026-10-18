@@ -21,7 +21,7 @@ function load(file, mocks = {}) {
 const schema = load("src/db/schema.ts");
 const customerSchema = load("src/db/customer-schema.ts", { "./schema": schema });
 const crmSchema = load("src/db/crm-schema.ts", { "./schema": schema });
-const qualification = load("src/lib/qualification.ts");
+const qualification = load("src/lib/qualification.ts", { "@/lib/countries": load("src/lib/countries.ts") });
 const crm = load("src/lib/crm.ts");
 const initial = { ok: false, message: "" };
 class UnauthorizedError extends Error {}
@@ -29,7 +29,7 @@ const staff = { id: 3, name: "Conseiller", email: "staff@example.com", role: "ad
 function data(overrides = {}) {
   const fd = new FormData();
   for (const [key, value] of Object.entries({
-    fullName: "Awa Test", whatsapp: "+225 07 00 00 00 00", country: "cote_ivoire",
+    fullName: "Awa Test", whatsapp: "+225 07 00 00 00 00", country: "CI",
     profile: "job_seeker", discoverySource: "whatsapp", need: "improve_cv", cvStatus: "outdated",
     timeline: "week", targetOffer: "", difficulty: "", budget: "7000_10000",
     paymentReadiness: "advisor", contactWhatsApp: "no", consentPrivacy: "on", ...overrides,
@@ -262,4 +262,40 @@ test("database failure during staff authentication returns no CRM data and perfo
   assert.equal(result.ok, false);
   assert.deepEqual(Object.keys(result).sort(), ["message", "ok"]);
   assert.equal(fixture.reads(), 0);
+});
+
+
+test("qualification accepts all ISO countries, rejects broad categories, and preserves historical labels", () => {
+  const countries = qualification.qualificationOptions.country;
+  assert.equal(countries.length, 249);
+  assert.equal(new Set(countries.map(({ value }) => value)).size, 249);
+  for (const { value, label } of countries) {
+    assert.match(value, /^[A-Z]{2}$/);
+    assert.ok(label.length > 2);
+    const result = qualification.validateQualification(data({ country: value }));
+    assert.equal(result.ok, true, value);
+    assert.equal(result.data.country, value);
+  }
+  for (const invalid of ["", "XX", "EU", "ZZ", "fr", "France", "africa", "europe_america", "other", "cote_ivoire", "__proto__"]) {
+    assert.ok(qualification.validateQualification(data({ country: invalid })).fieldErrors.country, invalid);
+  }
+  assert.equal(qualification.qualificationLabel("country", "CI"), "Côte d’Ivoire");
+  assert.equal(qualification.qualificationLabel("country", "FR"), "France");
+  assert.equal(qualification.qualificationLabel("country", "SN"), "Sénégal");
+  assert.equal(qualification.qualificationLabel("country", "cote_ivoire"), "Côte d’Ivoire");
+  assert.equal(qualification.qualificationLabel("country", "africa"), "Autre pays africain");
+  assert.equal(qualification.qualificationLabel("country", "europe_america"), "Europe ou Amérique");
+  assert.equal(qualification.qualificationLabel("country", "europe"), "Europe ou Amérique");
+  assert.equal(qualification.qualificationLabel("country", "other"), "Autre");
+  assert.equal(qualification.qualificationLabel("country", null), "Non renseigné");
+  assert.equal(qualification.validateQualification(data({ country: "CI", whatsapp: "07 00 00 00 00" })).data.whatsapp, "+2250700000000");
+  assert.equal(qualification.validateQualification(data({ country: "FR", whatsapp: "07 00 00 00 00" })).ok, false);
+  assert.equal(qualification.validateQualification(data({ country: "FR", whatsapp: "+33 6 12 34 56 78" })).data.whatsapp, "+33612345678");
+});
+
+test("qualification need links accept only a single known catalogue need", () => {
+  for (const { value } of qualification.qualificationOptions.need) assert.equal(qualification.getInitialQualificationNeed(value), value);
+  for (const value of [undefined, null, "", "__proto__", "job", "<script>", ["first_cv"], ["first_cv", "interview"]]) {
+    assert.equal(qualification.getInitialQualificationNeed(value), null);
+  }
 });

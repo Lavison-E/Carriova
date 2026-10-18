@@ -124,11 +124,11 @@ test("missing DATABASE_URL does not initialize PostgreSQL during module import",
 test("editorial content remains available without database configuration", async () => {
   const queries = load("src/lib/queries.ts", { "@/db": dbUnavailable, "@/db/schema": schema, "@/lib/editorial": editorial });
   for (const result of await Promise.all([
-    queries.getPublishedJobs(), queries.getRelatedJobs("missing"),
+
     queries.getRelatedPosts("missing", "cv"), queries.getFaqs("home"),
     queries.getPricingOffers(), queries.getPublishedTestimonials(),
   ])) assert.deepEqual(result, []);
-  assert.equal(await queries.getJobBySlug("missing"), null);
+
   assert.equal(await queries.getPostBySlug("missing"), null);
   const article = editorial.editorialPosts.find((post) => post.slug === "organiser-sa-recherche-emploi");
   assert.ok(article);
@@ -136,19 +136,18 @@ test("editorial content remains available without database configuration", async
   assert.equal(await queries.getPostBySlug(article.slug), article);
   assert.deepEqual(await queries.getPublishedPosts("cv"), []);
   assert.deepEqual(await queries.getRelatedPosts(article.slug, article.cluster), []);
-  assert.deepEqual(await queries.getJobFacets(), {
-    locations: [], industries: [], contractTypes: [], experiences: [], workModes: [],
-  });
+
 });
 
-test("published-only detail queries are parameterized and reject configured database failures", async () => {
+test("published-only article detail queries are parameterized and reject configured database failures", async () => {
   const calls = [];
   const database = drizzle({ async query(config, values) { calls.push({ sql: config.text, values }); return { rows: [] }; } }, { schema });
   const queries = load("src/lib/queries.ts", {
     "@/db": { databaseConfigured: true, getDb: () => database }, "@/db/schema": schema, "@/lib/editorial": editorial,
   });
-  await queries.getJobBySlug("private-job");
+
   await queries.getPostBySlug("private-post");
+  assert.equal(calls.length, 1);
   for (const call of calls) {
     assert.match(call.sql, /"is_published" = \$2/);
     assert.equal(call.values[1], true);
@@ -157,7 +156,7 @@ test("published-only detail queries are parameterized and reject configured data
   const failing = load("src/lib/queries.ts", {
     "@/db": { databaseConfigured: true, getDb() { throw new Error("offline"); } }, "@/db/schema": schema, "@/lib/editorial": editorial,
   });
-  await assert.rejects(failing.getPublishedJobs(), /offline/);
+
   await assert.rejects(failing.getPublishedPosts(), /offline/);
   await assert.rejects(failing.getPostBySlug("organiser-sa-recherche-emploi"), /offline/);
 });

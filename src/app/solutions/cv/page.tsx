@@ -16,7 +16,7 @@ export const metadata = buildMetadata({
 });
 
 export default async function CvSolutionPage() {
-  const faqs = await getFaqs("cv");
+  const faqs = await getFaqs("cv").catch(() => []);
   return (
     <>
       <SolutionView content={solutionPages.cv} faqs={faqs} />

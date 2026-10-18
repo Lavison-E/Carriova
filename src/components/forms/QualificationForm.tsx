@@ -6,7 +6,7 @@ import { CareerIcon } from "@/components/brand/CareerIcon";
 import { ButtonLink, cn } from "@/components/ui/primitives";
 import type { ActionState } from "@/lib/actions";
 import { submitQualification } from "@/lib/qualification-actions";
-import { QUALIFICATION_PRIVACY_NOTICE, qualificationOptions, validateQualification } from "@/lib/qualification";
+import { QUALIFICATION_PRIVACY_NOTICE, qualificationOptions, validateQualification, type QualificationNeed } from "@/lib/qualification";
 
 const initialState: ActionState = { ok: false, message: "" };
 
@@ -54,7 +54,7 @@ function QuestionLabel({ number, title, required }: { number: number; title: str
 }
 
 function Choices({ name, title, number, value, onChange, error, required = true, columns = 2 }: {
-  name: keyof typeof qualificationOptions;
+  name: Exclude<keyof typeof qualificationOptions, "country">;
   title: string;
   number: number;
   value: string;
@@ -90,11 +90,11 @@ function Choices({ name, title, number, value, onChange, error, required = true,
   );
 }
 
-export function QualificationForm() {
+export function QualificationForm({ initialNeed = null }: { initialNeed?: QualificationNeed | null }) {
   const [state, action, pending] = useActionState(submitQualification, initialState);
   const [lastResponse, setLastResponse] = useState(state);
   const [step, setStep] = useState(0);
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>((): Record<string, string> => initialNeed ? { need: initialNeed } : {});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showResponse, setShowResponse] = useState(false);
   const [focusRequest, setFocusRequest] = useState<{ target: "heading" | "error"; revision: number } | null>(null);
@@ -252,7 +252,17 @@ export function QualificationForm() {
                 {errors.whatsapp ? <p id="qualification-whatsapp-error" className="mt-2 text-xs leading-5 text-orange">{errors.whatsapp}</p> : null}
               </div>
             </div>
-            <Choices name="country" number={3} title="Dans quel pays résidez-vous ?" value={values.country ?? ""} onChange={updateValue} error={errors.country} />
+            <div>
+              <label htmlFor="qualification-country"><QuestionLabel number={3} title="Dans quel pays résidez-vous ?" required /></label>
+              <select id="qualification-country" name="country" autoComplete="country" required value={values.country ?? ""} onChange={(event) => updateValue("country", event.target.value)} aria-invalid={errors.country ? true : undefined} aria-describedby={errors.country ? "qualification-country-error" : undefined} className="mt-3 min-h-12 w-full rounded-lg border border-line bg-white px-4 py-3 text-base text-night focus:border-night">
+                <option value="" disabled>Sélectionnez votre pays de résidence</option>
+                <option value="CI">Côte d’Ivoire</option>
+                <optgroup label="Autres pays et territoires">
+                  {qualificationOptions.country.filter((option) => option.value !== "CI").map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </optgroup>
+              </select>
+              {errors.country ? <p id="qualification-country-error" className="mt-2 text-xs leading-5 text-orange">{errors.country}</p> : null}
+            </div>
             <Choices name="profile" number={4} title="Quelle est votre situation professionnelle actuelle ?" value={values.profile ?? ""} onChange={updateValue} error={errors.profile} />
             <Choices name="discoverySource" number={5} title="Où avez-vous découvert Carriova ?" value={values.discoverySource ?? ""} onChange={updateValue} error={errors.discoverySource} />
           </div>

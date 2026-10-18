@@ -1,7 +1,8 @@
+import { JobFilters } from "@/components/jobs/JobFilters";
 import Link from "next/link";
 import { PageHero } from "@/components/layout/PageHero";
 import { ButtonLink, JsonLd, Section } from "@/components/ui/primitives";
-import { getJobFacets, getPublishedJobs } from "@/lib/queries";
+import { getJobFacets, getOpportunityCatalog, getPublishedJobs } from "@/lib/job-catalog";
 import { breadcrumbJsonLd, buildMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export const metadata = buildMetadata({
   keywords: ["offres d’emploi", "emploi Abidjan", "recherche d’emploi Côte d’Ivoire"],
 });
 
-type FilterKey = "q" | "location" | "industry" | "contractType" | "experience" | "workMode";
+type FilterKey = "q" | "location" | "country" | "industry" | "contractType" | "experience" | "workMode";
 type Search = Partial<Record<FilterKey, string | string[]>>;
 
 function firstValue(value: string | string[] | undefined) {
@@ -30,14 +31,16 @@ export default async function EmploiPage({
   const params = {
     q: firstValue(raw.q),
     location: firstValue(raw.location),
+    country: firstValue(raw.country),
     industry: firstValue(raw.industry),
     contractType: firstValue(raw.contractType),
     experience: firstValue(raw.experience),
     workMode: firstValue(raw.workMode),
   };
   const hasFilters = Object.values(params).some(Boolean);
-  const [jobs, facets] = await Promise.all([getPublishedJobs(params), getJobFacets()]);
+  const [jobs, facets, catalog] = await Promise.all([getPublishedJobs(params), getJobFacets(), getOpportunityCatalog()]);
   const filters = [
+    { name: "country", label: "Pays", placeholder: "Tous les pays", options: facets.countries },
     { name: "location", label: "Lieu", placeholder: "Tous les lieux", options: facets.locations },
     { name: "industry", label: "Secteur", placeholder: "Tous les secteurs", options: facets.industries },
     { name: "contractType", label: "Contrat", placeholder: "Tous les contrats", options: facets.contractTypes },
@@ -61,13 +64,13 @@ export default async function EmploiPage({
         eyebrow="Emploi & opportunités"
         title="Trouvez une opportunité qui vous correspond."
         text="Un métier, un lieu, une nouvelle ambition. Affinez votre recherche et préparez une candidature adaptée à chaque opportunité."
-        primary={{ href: "/solutions/cv", label: "Créer mon CV" }}
-        secondary={{ href: "/solutions/matching", label: "Comprendre le matching" }}
+        primary={{ href: `/emploi${activeFilters.length ? "?" + new URLSearchParams(activeFilters).toString() : ""}#offres`, label: "Explorer les offres" }}
+        secondary={{ href: "/qualification?need=targeted_cv", label: "Faire adapter mon CV" }}
         crumbs={crumbs}
       />
-      <Section tone="paper" className="!pt-10 md:!pt-14">
+      <Section id="offres" tone="paper" className="!pt-10 md:!pt-14 scroll-mt-24">
         <div className="grid items-start gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-10">
-          <aside className="lg:sticky lg:top-28">
+          <aside className="lg:sticky lg:top-28"><JobFilters activeCount={activeFilters.length}>
             <form key={JSON.stringify(params)}
               className="rounded-xl border border-line bg-white p-5 sm:p-6"
               method="get"
@@ -123,7 +126,7 @@ export default async function EmploiPage({
                 <Link href="/emploi" className="mt-4 block py-1 text-center text-sm text-muted underline decoration-line underline-offset-4 hover:text-night">Réinitialiser les filtres</Link>
               ) : null}
             </form>
-          </aside>
+          </JobFilters></aside>
 
           <div className="min-w-0">
             <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
@@ -134,6 +137,12 @@ export default async function EmploiPage({
                 </h2>
               </div>
               {jobs.length > 0 ? <p className="text-xs text-muted">Les plus récentes en premier</p> : null}
+            </div>
+
+            <div className="mt-5 rounded-lg border border-line bg-white p-4 text-xs leading-6 text-muted">
+              <p>Offres issues des pages officielles des recruteurs. Candidature directe, sans achat de service Carriova.</p>
+              {catalog.verifiedAt ? <p>Flux Accor consulté le {new Date(catalog.verifiedAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Africa/Abidjan" })} (Abidjan). Les dates de vérification des autres offres figurent sur leurs fiches. Une offre peut être retirée entre deux consultations.</p> : null}
+              {catalog.unavailable ? <p role="status" className="mt-2 font-medium text-night">Une source est momentanément indisponible. La sélection affichée peut être incomplète ; réessayez plus tard.</p> : null}
             </div>
 
             {hasFilters ? (
@@ -180,13 +189,13 @@ export default async function EmploiPage({
                     <Link href={`/emploi/${job.slug}`} className="group block rounded-xl border border-line bg-white p-6 transition-colors hover:border-night/40 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-night sm:p-7">
                       <div className="flex items-start justify-between gap-5">
                         <div className="min-w-0">
-                          <p className="text-xs font-medium leading-5 text-muted">{job.company}</p>
+                          <p className="text-xs font-medium leading-5 text-muted">{job.company}</p><p className="mt-1 text-[0.65rem] uppercase tracking-wider text-[#bd470d]">Source : {job.sourceName}</p>
                           <h3 className="mt-2 text-xl font-semibold leading-snug tracking-tight text-night transition-colors group-hover:text-[#bd470d] sm:text-2xl">{job.title}</h3>
                           <p className="mt-2 text-sm leading-6 text-muted">{job.location}, {job.country}{job.experience ? ` · ${job.experience}` : ""}</p>
                         </div>
                         <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line text-night transition-colors group-hover:border-night group-hover:bg-night group-hover:text-white sm:flex" aria-hidden="true">↗</span>
                       </div>
-                      <p className="mt-4 line-clamp-2 max-w-2xl text-sm leading-7 text-muted">{job.description}</p>
+                      <p className="mt-4 line-clamp-2 max-w-2xl text-sm leading-7 text-muted">{job.description}</p><p className="mt-2 text-xs text-muted">{job.publishedAt ? `Publiée le ${new Date(job.publishedAt).toLocaleDateString("fr-FR", {timeZone: "Africa/Abidjan"})}` : "Date de publication non précisée"}{job.expiresAt ? ` · Clôture le ${new Date(job.expiresAt).toLocaleDateString("fr-FR", {timeZone: "Africa/Abidjan"})}` : ""}</p>
                       <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-5">
                         {[job.contractType, job.workMode, job.industry].filter(Boolean).map((label, index) => (
                           <span key={`${label}-${index}`} className="rounded-md bg-[#f7f5ef] px-2.5 py-1.5 text-xs font-medium text-night">{label}</span>

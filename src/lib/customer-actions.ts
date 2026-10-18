@@ -40,14 +40,14 @@ export async function customerSignup(_prev:ActionState,fd:FormData):Promise<Acti
  const errors:Record<string,string>={};
  if(name.length<2||name.length>120)errors.name="Indiquez votre nom (2 à 120 caractères).";
  if(!isEmail(email)||email.length>255)errors.email="Indiquez une adresse e-mail valide.";
- if(password.length<15||password.length>256)errors.password="Choisissez un mot de passe de 15 à 256 caractères.";
+ if(password.length<8||password.length>256)errors.password="Choisissez un mot de passe de 8 à 256 caractères.";
  if(password!==value(fd,"confirmPassword"))errors.confirmPassword="Les mots de passe doivent être identiques.";
  if(!["on","true"].includes(value(fd,"consentPrivacy")))errors.consentPrivacy="Votre accord est nécessaire pour créer votre espace.";
  if(Object.keys(errors).length)return {ok:false,message:"Vérifiez les champs indiqués.",fieldErrors:errors};
  if(!databaseConfigured)return unavailable;
  try{
   if(!await allowed(email,"signup"))return {ok:false,message:"Trop de tentatives. Réessayez dans quinze minutes."};
-  const passwordHash=await hashPassword(password),jar=await cookies();
+  const passwordHash=await hashPassword(password,{minLength:8}),jar=await cookies();
   const token=await getDb().transaction(async tx=>{
    const [user]=await tx.insert(customerUsers).values({name,email,passwordHash,consentPrivacy:true,consentMarketing:["on","true"].includes(value(fd,"consentMarketing")),consentVersion:"2026-10-18"}).onConflictDoNothing({target:customerUsers.email}).returning({id:customerUsers.id,email:customerUsers.email,name:customerUsers.name});
    if(!user)return null;
@@ -89,11 +89,11 @@ export async function customerLogout(){
 export async function customerChangePassword(_prev:ActionState,fd:FormData):Promise<ActionState>{
  try{
   const user=await requireCustomer(),current=value(fd,"currentPassword"),password=value(fd,"newPassword");
-  if(password.length<15||password.length>256||password!==value(fd,"confirmPassword"))return {ok:false,message:"Le nouveau mot de passe doit contenir au moins 15 caractères et être confirmé à l’identique."};
+  if(password.length<8||password.length>256||password!==value(fd,"confirmPassword"))return {ok:false,message:"Le nouveau mot de passe doit contenir au moins 8 caractères et être confirmé à l’identique."};
   if(!await allowed(user.email,"password"))return {ok:false,message:"Trop de tentatives. Réessayez dans quinze minutes."};
   const [record]=await getDb().select().from(customerUsers).where(and(eq(customerUsers.id,user.id),eq(customerUsers.enabled,true))).limit(1);
   if(!record||!await verifyPassword(current,record.passwordHash))return {ok:false,message:"Le mot de passe actuel est incorrect."};
-  const passwordHash=await hashPassword(password),jar=await cookies();
+  const passwordHash=await hashPassword(password,{minLength:8}),jar=await cookies();
   const token=await getDb().transaction(async tx=>{
    const [changed]=await tx.update(customerUsers).set({passwordHash}).where(and(eq(customerUsers.id,user.id),eq(customerUsers.passwordHash,record.passwordHash),eq(customerUsers.enabled,true))).returning({id:customerUsers.id});
    if(!changed)throw new Error("Concurrent credential change");
@@ -138,11 +138,11 @@ export async function customerRequestReset(_prev:ActionState,fd:FormData):Promis
 export async function customerResetPassword(_prev:ActionState,fd:FormData):Promise<ActionState>{
  const token=value(fd,"token"),password=value(fd,"password");
  if(!/^[A-Za-z0-9_-]{43}$/.test(token))return {ok:false,message:"Ce lien de récupération est invalide ou expiré."};
- if(password.length<15||password.length>256||password!==value(fd,"confirmPassword"))return {ok:false,message:"Choisissez au moins 15 caractères et confirmez le mot de passe à l’identique."};
+ if(password.length<8||password.length>256||password!==value(fd,"confirmPassword"))return {ok:false,message:"Choisissez au moins 8 caractères et confirmez le mot de passe à l’identique."};
  if(!databaseConfigured)return unavailable;
  try{
   if(!await allowed(customerTokenHash(token),"reset"))return {ok:false,message:"Trop de tentatives. Réessayez dans quinze minutes."};
-  const passwordHash=await hashPassword(password);
+  const passwordHash=await hashPassword(password,{minLength:8});
   const reset=await getDb().transaction(async tx=>{
    const hashedToken=customerTokenHash(token);
    // Discover the owner without locking the token, then always lock user before token.

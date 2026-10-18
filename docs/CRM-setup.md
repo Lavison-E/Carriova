@@ -78,7 +78,7 @@ Pour accepter le fichier et son enveloppe multipart, la limite des Server Action
 
 ## Comptes clients et récupération d’accès
 
-L’inscription demande le nom, l’adresse e-mail, un mot de passe d’au moins 15 caractères et le consentement nécessaire au compte. Le consentement marketing est distinct. Les mots de passe ne sont pas conservés en clair. La session client dure 7 jours et utilise un cookie HttpOnly, SameSite=Lax, Secure en production. Le compte doit rester actif à chaque requête. Un changement ou une réinitialisation du mot de passe révoque les sessions précédentes.
+L’inscription demande le nom, l’adresse e-mail, un mot de passe d’au moins 8 caractères et le consentement nécessaire au compte. Le consentement marketing est distinct. Les mots de passe ne sont pas conservés en clair. La session client dure 7 jours et utilise un cookie HttpOnly, SameSite=Lax, Secure en production. Le compte doit rester actif à chaque requête. Un changement ou une réinitialisation du mot de passe révoque les sessions précédentes.
 
 La récupération à `/compte/recuperer` utilise l’intégration Resend lorsqu’elle est configurée. Renseigner côté serveur :
 

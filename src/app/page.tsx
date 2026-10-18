@@ -1,8 +1,9 @@
+import { getPublishedJobs } from "@/lib/job-catalog";
 import Image from "next/image";
 import Link from "next/link";
 import { CareerIcon, type CareerIconName } from "@/components/brand/CareerIcon";
 import { Badge, ButtonLink, Eyebrow, FaqList, JsonLd, Section } from "@/components/ui/primitives";
-import { getFaqs, getPublishedJobs, getPublishedPosts } from "@/lib/queries";
+import { getFaqs, getPublishedPosts } from "@/lib/queries";
 import { breadcrumbJsonLd, faqJsonLd } from "@/lib/seo";
 import { solutions } from "@/lib/site";
 

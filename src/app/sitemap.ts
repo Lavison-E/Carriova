@@ -1,5 +1,6 @@
+import { getPublishedJobs } from "@/lib/job-catalog";
 import type { MetadataRoute } from "next";
-import { getPublishedJobs, getPublishedPosts } from "@/lib/queries";
+import { getPublishedPosts } from "@/lib/queries";
 import { absoluteUrl } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";

@@ -14,6 +14,6 @@ export const metadata = buildMetadata({
 });
 
 export default async function OpportunitiesSolutionPage() {
-  const faqs = await getFaqs("opportunites");
+  const faqs = await getFaqs("opportunites").catch(() => []);
   return <SolutionView content={solutionPages.opportunites} faqs={faqs} />;
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { QualificationForm } from "@/components/forms/QualificationForm";
 import { Breadcrumb, JsonLd } from "@/components/ui/primitives";
+import { getInitialQualificationNeed } from "@/lib/qualification";
 import { breadcrumbJsonLd, buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
@@ -9,7 +10,10 @@ export const metadata = buildMetadata({
   path: "/qualification",
 });
 
-export default function QualificationPage() {
+export default async function QualificationPage({ searchParams }: {
+  searchParams: Promise<{ need?: string | string[] }>;
+}) {
+  const initialNeed = getInitialQualificationNeed((await searchParams).need);
   const crumbs = [{ href: "/", label: "Accueil" }, { href: "/qualification", label: "Votre projet" }];
 
   return (
@@ -30,7 +34,7 @@ export default function QualificationPage() {
           </div>
 
           <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,0.8fr)] lg:gap-10">
-            <QualificationForm />
+            <QualificationForm initialNeed={initialNeed} />
             <aside className="space-y-7 lg:sticky lg:top-28">
               <div className="rounded-xl bg-night p-7 text-white sm:p-8">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#edab84]">Votre projet, notre point de départ</p>

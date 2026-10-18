@@ -99,13 +99,13 @@ export const intents = [
     id: "job",
     label: "Je cherche un emploi",
     href: "/emploi",
-    cta: "Trouver un emploi",
+    cta: "Explorer les opportunités",
   },
   {
     id: "cv",
     label: "Je veux améliorer mon CV",
     href: "/solutions/cv",
-    cta: "Créer mon CV",
+    cta: "Découvrir le service CV",
   },
   {
     id: "career",
@@ -117,7 +117,7 @@ export const intents = [
     id: "coaching",
     label: "Je veux un coaching carrière",
     href: "/solutions/coaching",
-    cta: "Réserver une séance",
+    cta: "Découvrir le coaching",
   },
   {
     id: "recruit",
@@ -162,7 +162,7 @@ export const ecosystemModules = [
     n: "06",
     title: "Candidatures",
     href: "/emploi",
-    text: "Préparez, adaptez et suivez vos candidatures dans un parcours cohérent.",
+    text: "Préparez vos documents, puis candidatez selon les modalités indiquées par le recruteur.",
   },
   {
     n: "07",
@@ -174,7 +174,7 @@ export const ecosystemModules = [
     n: "08",
     title: "Expertise humaine",
     href: "/solutions/expertise",
-    text: "L’IA structure. La méthode décide. L’expertise humaine valide lorsque c’est nécessaire.",
+    text: "Faites relire vos documents et échangez avec notre équipe sur les améliorations utiles.",
   },
 ] as const;
 
@@ -182,33 +182,33 @@ export const solutions = [
   {
     slug: "cv",
     title: "CV professionnel",
-    short: "Positionnez votre parcours et produisez un CV convaincant.",
+    short: "Travaillez votre CV avec notre équipe à partir de votre parcours et de votre objectif.",
     href: "/solutions/cv",
-    cta: "Créer mon CV",
+    cta: "Découvrir le service CV",
     audience: "Chercheurs d’emploi, professionnels, étudiants, diaspora",
   },
   {
     slug: "lettre-de-motivation",
     title: "Lettre de motivation",
-    short: "Racontez votre contribution avec une lettre réellement personnalisée.",
+    short: "Préparez avec notre équipe une lettre reliée au poste que vous visez.",
     href: "/solutions/lettre-de-motivation",
-    cta: "Créer ma lettre",
+    cta: "Découvrir le service lettre",
     audience: "Candidats qui visent un poste précis",
   },
   {
     slug: "opportunites",
     title: "Emploi & opportunités",
-    short: "Découvrez des opportunités alignées avec votre profil et votre marché.",
+    short: "Consultez les offres publiées et leurs modalités de candidature.",
     href: "/solutions/opportunites",
-    cta: "Trouver un emploi",
+    cta: "Explorer les opportunités",
     audience: "Chercheurs d’emploi et jeunes diplômés",
   },
   {
     slug: "matching",
     title: "Matching emploi-profil",
-    short: "Comprenez l’adéquation entre votre profil et une offre, sans promesse artificielle.",
+    short: "Étudiez une offre et les adaptations de votre candidature avec notre équipe.",
     href: "/solutions/matching",
-    cta: "Analyser mon profil",
+    cta: "Découvrir l’accompagnement",
     audience: "Candidats qui veulent candidater avec discernement",
   },
   {
@@ -216,7 +216,7 @@ export const solutions = [
     title: "Coaching carrière",
     short: "Un accompagnement humain pour clarifier, décider et progresser.",
     href: "/solutions/coaching",
-    cta: "Réserver une séance",
+    cta: "Découvrir le coaching",
     audience: "Professionnels, étudiants, personnes en reconversion",
   },
   {
@@ -303,8 +303,8 @@ export const whyPoints = [
     text: "Nous ne commençons pas par un modèle. Nous commençons par comprendre votre potentiel et le poste visé.",
   },
   {
-    title: "IA, règles et expertise humaine",
-    text: "L’IA aide à structurer. Les règles métier encadrent. L’humain valide lorsque la décision le mérite.",
+    title: "Un accompagnement humain",
+    text: "L’équipe étudie votre besoin, travaille avec vous et partage les documents dans votre espace.",
   },
   {
     title: "Conçu pour l’Afrique et l’international",

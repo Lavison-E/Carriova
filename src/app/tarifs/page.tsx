@@ -1,102 +1,64 @@
 import Link from "next/link";
+import { CareerIcon } from "@/components/brand/CareerIcon";
 import { PageHero } from "@/components/layout/PageHero";
 import { ButtonLink, JsonLd, Section } from "@/components/ui/primitives";
 import { getPricingOffers } from "@/lib/queries";
 import { breadcrumbJsonLd, buildMetadata } from "@/lib/seo";
 import { parseStringList } from "@/lib/security";
+import { catalogueOffers, qualificationRequestHref, serviceNeedForSlug, workspaceRequestHref, type CommercialOffer } from "@/lib/service-catalog";
 
 export const dynamic = "force-dynamic";
-
 export const metadata = buildMetadata({
-  title: "Tarifs",
-  description:
-    "CV, lettre, audit et coaching : découvrez les offres CARRIOVA ou demandez un devis adapté à votre projet professionnel.",
+  title: "Tarifs et accompagnements",
+  description: "Premier CV, candidature ciblée, lettre, entretien ou coaching : choisissez votre accompagnement CARRIOVA et demandez une proposition adaptée à votre besoin.",
   path: "/tarifs",
 });
 
-export default async function PricingPage() {
-  const offers = await getPricingOffers();
-  const crumbs = [
-    { href: "/", label: "Accueil" },
-    { href: "/tarifs", label: "Tarifs" },
-  ];
+async function loadCommercialOffers() {
+  try {
+    const published = await getPricingOffers();
+    const offers: CommercialOffer[] = published.length ? published.map((offer) => ({
+      slug: offer.slug, name: offer.name, category: offer.category, tagline: offer.tagline,
+      benefits: parseStringList(offer.benefits), need: serviceNeedForSlug(offer.slug),
+      priceAmount: offer.priceAmount !== null && Number.isFinite(offer.priceAmount) && offer.priceAmount >= 0 ? offer.priceAmount : null,
+      currency: offer.currency?.trim() || "XOF", priceLabel: offer.priceLabel?.trim() || "Sur devis", featured: offer.featured,
+    })) : catalogueOffers;
+    return { offers, unavailable: false, hasPublishedOffers: published.length > 0 };
+  } catch {
+    return { offers: catalogueOffers, unavailable: true, hasPublishedOffers: false };
+  }
+}
 
-  return (
-    <>
-      <JsonLd data={breadcrumbJsonLd(crumbs.map((c) => ({ name: c.label, path: c.href })))} />
-      <PageHero
-        eyebrow="Tarifs & accompagnements"
-        title="Un accompagnement à votre mesure."
-        text="Votre besoin détermine le bon accompagnement. Découvrez nos offres ou parlons de votre projet pour établir un devis : vous connaîtrez le contenu et le tarif avant de vous engager."
-        primary={{ href: "/contact", label: "Demander un devis" }}
-        secondary={{ href: "/solutions", label: "Explorer les solutions" }}
-        crumbs={crumbs}
-      />
-      <Section>
-        {offers.length > 0 ? (
-          <>
-            <div className="mb-10 max-w-2xl">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-[#bd470d]">Les offres CARRIOVA</p>
-              <h2 className="font-editorial mt-4 text-4xl font-normal italic leading-tight text-night md:text-5xl">Choisissez votre prochain pas.</h2>
-            </div>
-            <div className="border-b border-night/20">
-              {offers.map((offer) => {
-                const benefits = parseStringList(offer.benefits);
-                const price = offer.priceAmount !== null
-                  ? `${offer.priceAmount.toLocaleString("fr-FR")} ${offer.currency ?? "XOF"}`
-                  : offer.priceLabel;
-                return (
-                  <article key={offer.slug} className="grid items-start gap-7 border-t border-night/20 py-10 md:grid-cols-12 md:gap-8">
-                    <div className="md:col-span-4">
-                      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.15em] text-[#bd470d]">{offer.category}{offer.featured ? " · Recommandé" : ""}</p>
-                      <h3 className="mt-4 text-2xl font-semibold tracking-tight text-night">{offer.name}</h3>
-                      {offer.tagline ? <p className="mt-4 text-sm leading-7 text-muted">{offer.tagline}</p> : null}
-                    </div>
-                    <ul className="space-y-4 md:col-span-5 md:pt-1">
-                      {benefits.map((item) => (
-                        <li key={item} className="flex items-start gap-3 text-sm leading-6 text-muted">
-                          <span aria-hidden="true" className="text-[#bd470d]">✓</span>{item}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="border-t border-night/10 pt-6 md:col-span-3 md:border-t-0 md:pt-0">
-                      <p className="text-2xl font-semibold tracking-tight text-night">{price}</p>
-                      <ButtonLink href={offer.ctaHref} className="mt-6" variant={offer.featured ? "orange" : "primary"} size="md">{offer.ctaLabel}</ButtonLink>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-            <p className="mt-8 text-sm leading-7 text-muted">Un besoin particulier ou plusieurs objectifs à combiner ? <Link href="/contact" className="font-semibold text-night underline decoration-night/30 underline-offset-4 hover:text-[#bd470d]">Parlons de votre projet.</Link></p>
-          </>
-        ) : (
-          <div className="grid items-start gap-10 md:grid-cols-12 lg:gap-20">
-            <div className="md:col-span-7">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-[#bd470d]">Un projet, une proposition</p>
-              <h2 className="font-editorial mt-5 max-w-xl text-5xl font-normal italic leading-[1.1] text-night">Commençons<br />par votre besoin.</h2>
-              <p className="mt-6 max-w-lg text-base leading-8 text-muted">CV, lettre de motivation, relecture ou coaching : notre équipe vous aide à préciser l’accompagnement qui vous sera utile.</p>
-              <p className="mt-4 max-w-lg text-sm leading-7 text-muted">Contactez-nous pour recevoir une proposition personnalisée, avec le contenu de l’accompagnement et son tarif.</p>
-              <ButtonLink href="/contact" variant="orange" size="lg" className="mt-8">Parler de mon projet<span aria-hidden="true">↗</span></ButtonLink>
-            </div>
-            <div className="rounded-xl bg-night p-7 text-white md:col-span-5 sm:p-9">
-              <h3 className="text-xl font-semibold">Préparons notre échange.</h3>
-              <p className="mt-4 text-sm leading-7 text-white/70">Quelques repères nous aideront à vous orienter :</p>
-              <ol className="mt-7 divide-y divide-white/20">
-                {[
-                  { title: "Votre objectif", text: "Le poste, l’évolution ou la candidature que vous préparez." },
-                  { title: "Votre point de départ", text: "Votre situation et les documents dont vous disposez déjà." },
-                  { title: "Votre échéance", text: "Le moment où vous souhaitez être prêt à avancer." },
-                ].map((item, index) => (
-                  <li key={item.title} className="flex gap-4 py-5 first:pt-0">
-                    <span aria-hidden="true" className="pt-0.5 text-xs text-[#edb294]">0{index + 1}</span>
-                    <div><p className="text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs leading-6 text-white/70">{item.text}</p></div>
-                  </li>
-                ))}
-              </ol>
-            </div>
+function priceText(offer: CommercialOffer) {
+  if (offer.priceAmount === null) return offer.priceLabel;
+  if (offer.priceAmount === 0) return "Offert";
+  return `${offer.priceAmount.toLocaleString("fr-FR")} ${offer.currency === "XOF" ? "FCFA" : offer.currency}`;
+}
+
+export default async function PricingPage() {
+  const { offers, unavailable, hasPublishedOffers } = await loadCommercialOffers();
+  const crumbs = [{ href: "/", label: "Accueil" }, { href: "/tarifs", label: "Tarifs" }];
+  return <>
+    <JsonLd data={breadcrumbJsonLd(crumbs.map((crumb) => ({ name: crumb.label, path: crumb.href })))} />
+    <PageHero eyebrow="Tarifs & accompagnements" title="Le bon accompagnement, au bon moment." text="Choisissez votre objectif et présentez-nous votre besoin. Le contenu de la prestation, son prix et l’échéance sont précisés dans une proposition avant de commencer." primary={{ href: "/qualification", label: "Demander une proposition" }} secondary={{ href: "/solutions", label: "Explorer les solutions" }} crumbs={crumbs} />
+    <Section className="!pt-8 md:!pt-12">
+      <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-orange">{hasPublishedOffers ? "Les offres publiées" : "Nos accompagnements sur devis"}</p><h2 className="mt-4 font-editorial text-4xl italic leading-tight text-night sm:text-5xl">Quel est votre prochain objectif ?</h2></div><p className="max-w-xs text-xs leading-7 text-muted">Chaque demande arrive à notre équipe. Vous pourrez ensuite retrouver votre proposition et vos échanges dans votre espace client.</p></div>
+      {unavailable ? <p role="status" className="mb-7 rounded-lg border border-line bg-paper p-4 text-xs leading-7 text-muted">Les tarifs publiés ne peuvent pas être chargés pour le moment. Vous pouvez consulter les accompagnements ci-dessous et demander un devis à l’équipe.</p> : null}
+      <div className="grid items-stretch gap-5 lg:grid-cols-2">
+        {offers.map((offer) => <article key={offer.slug} className={`flex min-w-0 flex-col rounded-xl border bg-white p-6 sm:p-8 ${offer.featured ? "border-night/40" : "border-line"}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-orange">{offer.category}</p>{offer.featured ? <span className="rounded-md bg-paper px-2.5 py-1 text-[10px] font-medium text-night">À découvrir</span> : null}</div>
+          <h3 className="mt-5 text-2xl font-semibold tracking-tight text-night">{offer.name}</h3>{offer.tagline ? <p className="mt-4 text-sm leading-7 text-muted">{offer.tagline}</p> : null}
+          <ul className="mb-7 mt-6 space-y-3">{offer.benefits.map((benefit, index) => <li key={`${index}-${benefit}`} className="flex items-start gap-3 text-xs leading-6 text-muted"><CareerIcon name="check" className="mt-1 h-4 w-4 shrink-0 text-orange" />{benefit}</li>)}</ul>
+          <div className="mt-auto border-t border-line pt-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-2xl font-semibold tracking-tight text-night">{priceText(offer)}</p><p className="mt-1 text-[10px] leading-5 text-muted">{offer.priceAmount === null ? "Proposition selon votre besoin" : offer.currency === "XOF" ? "Franc CFA · XOF" : "Tarif publié"}</p></div><Link href={qualificationRequestHref(offer.need)} aria-label={`Demander une proposition pour ${offer.name}`} className={`inline-flex min-h-12 items-center justify-between gap-5 rounded-lg px-5 py-3 text-xs font-semibold text-white ${offer.featured ? "bg-orange hover:bg-[#9e3708]" : "bg-night hover:bg-royal"}`}>Présenter mon besoin <CareerIcon name="arrow" className="h-4 w-4 shrink-0" /></Link></div>
+            <div className="mt-4 flex flex-col gap-1"><Link href={workspaceRequestHref(offer.need)} className="inline-flex min-h-9 items-center text-[11px] font-medium text-night underline decoration-line underline-offset-4 hover:text-orange">Déjà connecté ? Créer ma demande dans mon espace</Link>{!offer.need || offer.slug === "cv-lettre" ? <p className="text-[10px] leading-6 text-muted">Précisez « {offer.name} » dans votre message pour conserver le contexte de votre choix.</p> : null}</div>
           </div>
-        )}
-      </Section>
-    </>
-  );
+        </article>)}
+      </div>
+      <p className="mt-7 text-xs leading-7 text-muted">Le périmètre et l’échéance sont confirmés dans la proposition. L’envoi d’une demande et l’acceptation d’un devis dans votre espace ne déclenchent aucun paiement en ligne.</p>
+    </Section>
+    <Section tone="night">
+      <div className="grid gap-8 md:grid-cols-[1fr_1.1fr] md:gap-16"><div><p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#f7bd92]">Du besoin à la livraison</p><h2 className="mt-5 font-editorial text-4xl italic leading-tight text-white sm:text-5xl">Une suite claire,<br />à chaque étape.</h2><p className="mt-5 max-w-sm text-sm leading-7 text-white/70">Votre espace rassemble la proposition, les documents et la conversation avec l’équipe.</p></div><ol className="divide-y divide-white/20">{[{ title: "Vous présentez votre objectif", text: "Le formulaire nous aide à comprendre votre situation et votre priorité." }, { title: "Vous étudiez la proposition", text: "Vous échangez avec l’équipe et confirmez la prestation qui vous convient." }, { title: "Vous suivez le travail", text: "Les messages, les documents et l’avancement restent dans votre demande." }, { title: "Vous donnez votre retour", text: "À la livraison, vous pouvez valider le travail ou expliquer les ajustements souhaités." }].map((step, index) => <li key={step.title} className="flex gap-5 py-5 first:pt-0"><span className="pt-1 text-[11px] text-[#f7bd92]">0{index + 1}</span><div><h3 className="text-sm font-semibold text-white">{step.title}</h3><p className="mt-2 text-xs leading-7 text-white/70">{step.text}</p></div></li>)}</ol></div>
+    </Section>
+    <Section tone="paper"><div className="flex flex-col gap-7 md:flex-row md:items-center md:justify-between"><div className="max-w-xl"><h2 className="font-editorial text-4xl italic leading-tight text-night">Vous hésitez encore ?</h2><p className="mt-4 text-sm leading-7 text-muted">Présentez votre situation sans choisir de prestation à l’avance. Les offres d’emploi et les ressources publiques restent consultables sans compte.</p><div className="mt-4 flex flex-wrap gap-x-6 gap-y-2"><Link href="/emploi" className="inline-flex min-h-10 items-center text-xs font-semibold text-night underline decoration-line underline-offset-4">Consulter les offres d’emploi</Link><Link href="/ressources" className="inline-flex min-h-10 items-center text-xs font-semibold text-night underline decoration-line underline-offset-4">Explorer les ressources</Link></div></div><ButtonLink href="/qualification" variant="orange" size="lg">Faire le point sur mon besoin <CareerIcon name="arrow" className="h-4 w-4" /></ButtonLink></div></Section>
+  </>;
 }

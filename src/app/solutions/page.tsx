@@ -7,7 +7,7 @@ import { ecosystemModules, solutions } from "@/lib/site";
 export const metadata = buildMetadata({
   title: "Solutions carrière et employabilité",
   description:
-    "Découvrez l’écosystème CARRIOVA : CV professionnel, lettre de motivation, opportunités, matching, coaching et expertise humaine.",
+    "Découvrez les accompagnements CARRIOVA : CV, lettre de motivation, préparation de candidature, coaching et relecture. Suivez votre demande depuis votre espace.",
   path: "/solutions",
   keywords: ["solutions carrière", "CV", "coaching", "emploi"],
 });
@@ -43,7 +43,7 @@ export default function SolutionsPage() {
         eyebrow="Nos solutions"
         title="Une ambition. Plusieurs façons d’avancer."
         text="Un CV à repenser, une opportunité à saisir, une direction à clarifier. Trouvez l’accompagnement qui répond à votre prochain objectif."
-        primary={{ href: "/contact", label: "Parlons de votre projet" }}
+        primary={{ href: "/qualification", label: "Présenter mon projet" }}
         secondary={{ href: "/tarifs", label: "Voir les offres" }}
         crumbs={crumbs}
       />
@@ -66,7 +66,7 @@ export default function SolutionsPage() {
               </div>
               <p className="max-w-md text-sm leading-7 text-muted md:col-span-4">{item.short}</p>
               <span className="flex items-center gap-3 text-sm font-semibold text-night md:col-span-3 md:justify-self-end md:self-start">
-                {item.cta}
+                Découvrir le service
                 <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-night/20 text-lg transition-colors group-hover:border-[#bd470d] group-hover:bg-[#bd470d] group-hover:text-white">↗</span>
               </span>
             </Link>
@@ -106,7 +106,7 @@ export default function SolutionsPage() {
             <h2 className="font-editorial mt-4 text-4xl font-normal italic leading-tight text-night md:text-5xl">Vous hésitez sur<br />le prochain pas ?</h2>
             <p className="mt-5 text-sm leading-7 text-muted">Décrivez-nous votre situation. Nous vous aidons à choisir un accompagnement adapté à votre besoin.</p>
           </div>
-          <ButtonLink href="/contact" variant="orange" size="lg">Parler à l’équipe<span aria-hidden="true">↗</span></ButtonLink>
+          <ButtonLink href="/qualification" variant="orange" size="lg">Parler à l’équipe<span aria-hidden="true">↗</span></ButtonLink>
         </div>
       </Section>
     </>

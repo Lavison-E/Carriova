@@ -8,12 +8,12 @@ export const dynamic = "force-dynamic";
 export const metadata = buildMetadata({
   title: "Matching emploi-profil",
   description:
-    "Comprenez l’adéquation entre votre profil et une offre d’emploi. CARRIOVA compare compétences, expériences, objectifs et exigences, sans promesse artificielle.",
+    "Étudiez votre candidature avec l’équipe CARRIOVA : lecture de l’offre, parcours et adaptations utiles pour votre CV. Un accompagnement humain sur demande.",
   path: "/solutions/matching",
   keywords: ["matching emploi", "adéquation profil poste"],
 });
 
 export default async function MatchingPage() {
-  const faqs = await getFaqs("matching");
+  const faqs = await getFaqs("matching").catch(() => []);
   return <SolutionView content={solutionPages.matching} faqs={faqs} />;
 }

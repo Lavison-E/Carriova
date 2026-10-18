@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CoachingForm } from "@/components/forms/LeadForms";
+import { qualificationRequestHref, serviceNeedForSlug, workspaceRequestHref } from "@/lib/service-catalog";
 import { PageHero } from "@/components/layout/PageHero";
 import { ButtonLink, FaqList, JsonLd, Section } from "@/components/ui/primitives";
 import type { SolutionPageContent } from "@/lib/solution-content";
@@ -7,6 +7,10 @@ import { breadcrumbJsonLd, faqJsonLd } from "@/lib/seo";
 import type { Faq } from "@/db/schema";
 
 export function SolutionView({ content, faqs }: { content: SolutionPageContent; faqs: Faq[] }) {
+  const requestNeed = serviceNeedForSlug(content.slug);
+  const displayedFaqs = faqs.map((faq) => faq.answer === "Via le formulaire de la page coaching. Nous confirmons un créneau selon les disponibilités."
+    ? { ...faq, answer: "Présentez votre besoin dans le formulaire de qualification. L’équipe vous proposera un format et conviendra d’un créneau avec vous. Votre demande ne réserve pas automatiquement une séance." }
+    : faq);
   const crumbs = [
     { href: "/", label: "Accueil" },
     { href: "/solutions", label: "Solutions" },
@@ -16,7 +20,7 @@ export function SolutionView({ content, faqs }: { content: SolutionPageContent; 
   return (
     <>
       <JsonLd data={breadcrumbJsonLd(crumbs.map((c) => ({ name: c.label, path: c.href })))} />
-      {faqs.length ? <JsonLd data={faqJsonLd(faqs)} /> : null}
+      {displayedFaqs.length ? <JsonLd data={faqJsonLd(displayedFaqs)} /> : null}
       <PageHero
         eyebrow={content.eyebrow}
         title={content.title}
@@ -24,7 +28,9 @@ export function SolutionView({ content, faqs }: { content: SolutionPageContent; 
         primary={content.primary}
         secondary={content.secondary}
         crumbs={crumbs}
-      />
+      >
+        {content.slug !== "opportunites" ? <div className="max-w-2xl rounded-lg border border-night/15 bg-white/60 px-4 py-3"><p className="text-xs leading-6 text-muted">Le contenu, le tarif et l’échéance sont précisés avant le démarrage de la prestation.</p><Link href={workspaceRequestHref(requestNeed)} className="mt-1 inline-flex min-h-9 items-center gap-2 text-xs font-semibold text-night underline decoration-night/25 underline-offset-4 hover:text-orange">Déjà connecté ? Créer cette demande dans mon espace <span aria-hidden="true">↗</span></Link></div> : null}
+      </PageHero>
 
       <Section>
         <div className="grid gap-10 md:grid-cols-12 md:gap-8">
@@ -95,7 +101,7 @@ export function SolutionView({ content, faqs }: { content: SolutionPageContent; 
             </ul>
           </div>
           <div className="rounded-xl bg-[#f7f5ef] p-7 text-night md:col-span-5 md:mt-12 sm:p-9">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-[#bd470d]">Les livrables</p>
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-[#bd470d]">{content.slug === "opportunites" ? "Les ressources disponibles" : "Selon la proposition convenue"}</p>
             <h2 className="mt-4 text-2xl font-semibold tracking-tight">Ce que vous emportez.</h2>
             <ul className="mt-7 space-y-5">
               {content.deliverables.map((item) => (
@@ -111,27 +117,21 @@ export function SolutionView({ content, faqs }: { content: SolutionPageContent; 
 
       {content.slug === "coaching" ? (
         <Section id="reserver">
-          <div className="grid items-start gap-10 md:grid-cols-2 md:gap-16">
-            <div>
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-[#bd470d]">Parlons de votre projet</p>
-              <h2 className="font-editorial mt-5 text-5xl font-normal italic leading-tight text-night">Un temps pour vous.<br />Un cap pour la suite.</h2>
-              <p className="mt-6 max-w-md text-sm leading-7 text-muted">Partagez votre besoin et vos disponibilités. Nous vous recontactons pour confirmer un créneau. Aucun paiement n’est déclenché par cette demande.</p>
-            </div>
-            <div className="rounded-xl border border-night/15 bg-white p-6 sm:p-8">
-              <CoachingForm />
-            </div>
+          <div className="grid items-start gap-8 rounded-xl border border-line bg-paper p-6 sm:p-9 md:grid-cols-2 md:gap-12">
+            <div><p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-orange">Choisir le bon échange</p><h2 className="mt-5 font-editorial text-4xl italic leading-tight text-night">Votre objectif guide<br />le format de la séance.</h2><p className="mt-5 text-sm leading-7 text-muted">Présentez votre besoin. Le rendez-vous sera confirmé avec l’équipe après définition de l’accompagnement et de son tarif.</p></div>
+            <div className="space-y-4"><ButtonLink href={qualificationRequestHref("career_growth")} variant="orange" className="w-full justify-between">Faire le point sur ma carrière <span aria-hidden="true">↗</span></ButtonLink><ButtonLink href={qualificationRequestHref("interview")} variant="secondary" className="w-full justify-between">Préparer un entretien <span aria-hidden="true">↗</span></ButtonLink><p className="text-xs leading-6 text-muted">Vous pourrez retrouver la proposition, les échanges et les supports partagés dans votre espace client.</p></div>
           </div>
         </Section>
       ) : null}
 
-      {faqs.length ? (
+      {displayedFaqs.length ? (
         <Section tone="paper">
           <div className="grid gap-10 md:grid-cols-12 md:gap-12">
             <div className="md:col-span-4">
               <p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-[#bd470d]">Quelques réponses</p>
               <h2 className="font-editorial mt-4 text-4xl font-normal italic leading-tight text-night">Avant de<br />vous lancer.</h2>
             </div>
-            <div className="md:col-span-8"><FaqList items={faqs} /></div>
+            <div className="md:col-span-8"><FaqList items={displayedFaqs} /></div>
           </div>
         </Section>
       ) : null}

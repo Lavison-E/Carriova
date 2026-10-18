@@ -11,7 +11,7 @@ const { CORE_LEADS_SQL, loadTypeScript, migrationClient } = require("./helpers/c
 const schema = loadTypeScript("src/db/schema.ts");
 const customerSchema = loadTypeScript("src/db/customer-schema.ts", { "./schema": schema });
 const crmSchema = loadTypeScript("src/db/crm-schema.ts", { "./schema": schema });
-const qualification = loadTypeScript("src/lib/qualification.ts");
+const qualification = loadTypeScript("src/lib/qualification.ts", { "@/lib/countries": loadTypeScript("src/lib/countries.ts") });
 const crm = loadTypeScript("src/lib/crm.ts");
 const initial = { ok: false, message: "" };
 const staff = { id: 42, name: "Conseiller de test", email: "staff@example.test", role: "advisor" };
@@ -19,7 +19,7 @@ class UnauthorizedError extends Error {}
 function form(overrides = {}) {
   const fd = new FormData();
   for (const [key, value] of Object.entries({
-    fullName: "Qualification PostgreSQL", whatsapp: "+2250700000000", country: "cote_ivoire",
+    fullName: "Qualification PostgreSQL", whatsapp: "+2250700000000", country: "CI",
     profile: "job_seeker", discoverySource: "whatsapp", need: "improve_cv", cvStatus: "outdated",
     timeline: "week", targetOffer: "", difficulty: "", budget: "7000_10000",
     paymentReadiness: "advisor", contactWhatsApp: "no", consentPrivacy: "on", ...overrides,

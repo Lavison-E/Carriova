@@ -16,7 +16,7 @@ export const metadata = buildMetadata({
 });
 
 export default async function LetterPage() {
-  const faqs = await getFaqs("lettre");
+  const faqs = await getFaqs("lettre").catch(() => []);
   return (
     <>
       <SolutionView content={solutionPages["lettre-de-motivation"]} faqs={faqs} />

@@ -1,13 +1,10 @@
+import { countryOptions } from "@/lib/countries";
+
 export const QUALIFICATION_CONSENT_VERSION = "2026-10-18";
 export const QUALIFICATION_PRIVACY_NOTICE = "J’accepte que Carriova utilise les informations communiquées pour traiter ma demande et, si je le souhaite, me recontacte au sujet de cette demande.";
 
 export const qualificationOptions = {
-  country: [
-    { value: "cote_ivoire", label: "Côte d’Ivoire" },
-    { value: "africa", label: "Autre pays africain" },
-    { value: "europe_america", label: "Europe ou Amérique" },
-    { value: "other", label: "Autre" },
-  ],
+  country: countryOptions,
   profile: [
     { value: "student", label: "Étudiant(e) ou jeune diplômé(e)" },
     { value: "job_seeker", label: "En recherche d’emploi" },
@@ -78,6 +75,23 @@ export const qualificationSteps = [
   { id: "request", title: "Votre demande", fields: ["budget", "paymentReadiness", "contactWhatsApp", "message", "consentPrivacy", "consentMarketing"] },
 ] as const;
 
+export type QualificationNeed = (typeof qualificationOptions.need)[number]["value"];
+
+export function getInitialQualificationNeed(value: unknown): QualificationNeed | null {
+  return typeof value === "string"
+    ? qualificationOptions.need.find((option) => option.value === value)?.value ?? null
+    : null;
+}
+
+// Historical category answers remain readable, but are no longer valid new answers.
+const legacyCountryLabels: Record<string, string> = {
+  cote_ivoire: "Côte d’Ivoire",
+  africa: "Autre pays africain",
+  europe_america: "Europe ou Amérique",
+  europe: "Europe ou Amérique",
+  other: "Autre",
+};
+
 type OptionKey = keyof typeof qualificationOptions;
 type Answers = { [K in OptionKey]: (typeof qualificationOptions)[K][number]["value"] };
 export type QualificationInput = Omit<Answers, "targetOffer" | "difficulty"> & {
@@ -91,6 +105,7 @@ export type QualificationInput = Omit<Answers, "targetOffer" | "difficulty"> & {
 };
 
 export function qualificationLabel(key: OptionKey, value: string | null | undefined) {
+  if (key === "country" && value && Object.hasOwn(legacyCountryLabels, value)) return legacyCountryLabels[value];
   return qualificationOptions[key].find((option) => option.value === value)?.label ?? value ?? "Non renseigné";
 }
 
@@ -116,7 +131,7 @@ export function validateQualification(formData: FormData): {
   const rawPhone = text("whatsapp");
   const localPhone = rawPhone.replace(/[\s().-]/g, "");
   const whatsapp = normalizeQualificationPhone(
-    text("country") === "cote_ivoire" && /^0\d{9}$/.test(localPhone) ? `+225${localPhone}` : rawPhone,
+    text("country") === "CI" && /^0\d{9}$/.test(localPhone) ? `+225${localPhone}` : rawPhone,
   );
   if (!whatsapp) fieldErrors.whatsapp = "Indiquez un numéro WhatsApp valide avec son indicatif (ex. +225).";
   const answers: Record<string, string | null> = {};
