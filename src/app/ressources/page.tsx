@@ -3,6 +3,7 @@ import { ResourceLeadForm } from "@/components/forms/LeadForms";
 import { PageHero } from "@/components/layout/PageHero";
 import { JsonLd, Section } from "@/components/ui/primitives";
 import { breadcrumbJsonLd, buildMetadata } from "@/lib/seo";
+import { editorialPosts } from "@/lib/editorial";
 
 export const metadata = buildMetadata({
   title: "Ressources carrière",
@@ -35,6 +36,19 @@ export default function ResourcesPage() {
         text="Les bonnes questions, des conseils pratiques et le temps de faire le point. Retrouvez ici de quoi préparer votre prochain pas professionnel."
         crumbs={crumbs}
       />
+      <Section className="pb-0 md:pb-0">
+        <article className="grid gap-8 border-b border-night/20 pb-12 md:grid-cols-12 md:gap-12">
+          <div className="md:col-span-3">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-[#bd470d]">À lire maintenant</p>
+            <p className="mt-3 text-xs leading-6 text-muted">Recherche d’emploi<br />7 min de lecture · 18 octobre 2026</p>
+          </div>
+          <div className="md:col-span-9">
+            <h2 className="font-editorial max-w-3xl text-3xl italic leading-tight text-night sm:text-4xl"><Link href={`/blog/${editorialPosts[0].slug}`} className="hover:text-[#bd470d]">{editorialPosts[0].title}</Link></h2>
+            <p className="mt-5 max-w-2xl text-sm leading-7 text-muted">Sept étapes, un tableau de suivi et une routine hebdomadaire pour avancer avec méthode.</p>
+            <Link href={`/blog/${editorialPosts[0].slug}`} className="mt-5 inline-flex min-h-11 items-center gap-3 text-sm font-semibold text-night underline decoration-night/25 underline-offset-4 hover:text-[#bd470d]">Lire l’article<span aria-hidden="true">↗</span></Link>
+          </div>
+        </article>
+      </Section>
       <Section>
         <ol className="grid gap-x-16 md:grid-cols-2 lg:gap-x-24">
           {resources.map((item, index) => (

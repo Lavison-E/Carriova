@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Instrument_Serif, Plus_Jakarta_Sans } from "next/font/google";
 import { SiteFooter } from "@/components/layout/SiteFooter";
-import { SiteHeader } from "@/components/layout/SiteHeader";
+import { SiteFrame } from "@/components/layout/SiteFrame";
 import { StickyCta } from "@/components/layout/StickyCta";
 import { JsonLd } from "@/components/ui/primitives";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo";
 import Script from "next/script";
 import { serverEnv } from "@/lib/env";
-import { publicIntegrations, siteConfig } from "@/lib/site";
+import { siteConfig } from "@/lib/site";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -79,20 +79,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <a className="skip-link" href="#contenu">
           Aller au contenu
         </a>
-        <SiteHeader />
-        <main id="contenu">
-          {children}
-        </main>
-        <SiteFooter />
-        <StickyCta />
-        {publicIntegrations.plausibleDomain ? (
-          <Script
-            defer
-            data-domain={publicIntegrations.plausibleDomain}
-            src="https://plausible.io/js/script.js"
-            strategy="afterInteractive"
-          />
-        ) : null}
+        <SiteFrame footer={<SiteFooter />}>{children}</SiteFrame>
       </body>
     </html>
   );

@@ -1,6 +1,7 @@
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { databaseConfigured, getDb } from "@/db";
-import { blogPosts, faqs, jobs, pricingOffers, testimonials } from "@/db/schema";
+import { blogPosts, faqs, jobs, pricingOffers, testimonials, type BlogPost } from "@/db/schema";
+import { editorialPosts } from "@/lib/editorial";
 
 export async function getPublishedJobs(filters?: {
   q?: string;
@@ -86,40 +87,35 @@ export async function getJobFacets() {
   };
 }
 
-export async function getPublishedPosts(cluster?: string) {
-  if (!databaseConfigured) return [];
+export async function getPublishedPosts(cluster?: string): Promise<BlogPost[]> {
+  const localPosts = editorialPosts.filter((post) => !cluster || post.cluster === cluster);
+  if (!databaseConfigured) return [...localPosts];
   const clauses = [eq(blogPosts.isPublished, true)];
   if (cluster) clauses.push(eq(blogPosts.cluster, cluster));
-  return getDb()
+  const rows = await getDb()
     .select()
     .from(blogPosts)
     .where(and(...clauses))
     .orderBy(desc(blogPosts.publishedAt));
+  // Une version publiée en base prend la priorité sur le contenu livré avec le site.
+  const merged = new Map(localPosts.map((post) => [post.slug, post]));
+  for (const post of rows) merged.set(post.slug, post);
+  return [...merged.values()].sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
 }
 
-export async function getPostBySlug(slug: string) {
-  if (!databaseConfigured) return null;
+export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
+  const localPost = editorialPosts.find((post) => post.slug === slug) ?? null;
+  if (!databaseConfigured) return localPost;
   const rows = await getDb()
     .select()
     .from(blogPosts)
     .where(and(eq(blogPosts.slug, slug), eq(blogPosts.isPublished, true)))
     .limit(1);
-  return rows[0] ?? null;
+  return rows[0] ?? localPost;
 }
 
-export async function getRelatedPosts(slug: string, cluster: string) {
-  if (!databaseConfigured) return [];
-  return getDb()
-    .select()
-    .from(blogPosts)
-    .where(
-      and(
-        eq(blogPosts.isPublished, true),
-        eq(blogPosts.cluster, cluster),
-        sql`${blogPosts.slug} <> ${slug}`,
-      ),
-    )
-    .limit(3);
+export async function getRelatedPosts(slug: string, cluster: string): Promise<BlogPost[]> {
+  return (await getPublishedPosts(cluster)).filter((post) => post.slug !== slug).slice(0, 3);
 }
 
 export async function getFaqs(page: string) {

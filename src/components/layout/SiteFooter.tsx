@@ -21,7 +21,7 @@ export function SiteFooter() {
           </div>
           <div className="lg:pb-1">
             <p className="max-w-sm text-sm leading-7 text-white/65">Faisons le point sur votre situation et trouvons le prochain pas qui vous correspond.</p>
-            <ButtonLink href="/contact" variant="orange" size="lg" className="mt-6 w-full justify-between gap-10 rounded-lg sm:w-auto">
+            <ButtonLink href="/qualification" variant="orange" size="lg" className="mt-6 w-full justify-between gap-10 rounded-lg sm:w-auto">
               Parlons de mon projet <CareerIcon name="arrow" className="h-4 w-4" />
             </ButtonLink>
           </div>

@@ -156,7 +156,7 @@ function HeaderNavigation({ pathname }: { pathname: string }) {
 
         <div className="ml-auto hidden items-center gap-6 sm:flex xl:ml-0">
           <Link href="/compte/connexion" className="inline-flex min-h-11 items-center text-[13px] font-medium text-white/75 hover:text-white">Connexion</Link>
-          <ButtonLink href="/solutions" size="sm" variant="orange" className="gap-4 whitespace-nowrap rounded-lg" eventName="cta_click">
+          <ButtonLink href="/qualification" size="sm" variant="orange" className="gap-4 whitespace-nowrap rounded-lg" eventName="cta_click">
             Trouver ma solution <CareerIcon name="arrow" className="h-4 w-4" />
           </ButtonLink>
         </div>

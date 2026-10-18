@@ -43,7 +43,7 @@ export default async function HomePage() {
               CV, candidatures et coaching : avançons ensemble vers la carrière qui vous ressemble.
             </p>
             <div data-sticky-cta-observe className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <ButtonLink href="/solutions" variant="orange" size="lg">Trouver ma solution <CareerIcon name="arrow" className="ml-2 h-4 w-4" /></ButtonLink>
+              <ButtonLink href="/qualification" variant="orange" size="lg">Trouver ma solution <CareerIcon name="arrow" className="ml-2 h-4 w-4" /></ButtonLink>
               <Link href="/emploi" className="inline-flex min-h-12 items-center justify-center gap-2 px-3 text-sm font-semibold text-night underline decoration-night/25 underline-offset-8 transition-colors hover:text-orange">Explorer les offres <span aria-hidden="true">↗</span></Link>
             </div>
             <div className="mt-9 flex items-center gap-3 border-t border-line pt-5 text-xs leading-5 text-muted sm:max-w-[28rem]">

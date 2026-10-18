@@ -21,6 +21,7 @@ const staticPaths = [
   "/conseils-carriere",
   "/tarifs",
   "/contact",
+  "/qualification",
   "/faq",
   "/cv-professionnel",
   "/cv-etudiant",

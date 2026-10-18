@@ -11,7 +11,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "node scripts/seed.mjs",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "db:crm": "node scripts/migrate-crm.mjs",
+    "crm:user": "node scripts/staff-user.mjs"
   },
   "dependencies": {
     "dotenv": "17.3.1",
@@ -22,6 +24,8 @@
     "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
+    "@electric-sql/pglite-socket": "0.2.13",
     "@tailwindcss/postcss": "4.1.17",
     "@types/node": "22.19.15",
     "@types/pg": "8.18.0",

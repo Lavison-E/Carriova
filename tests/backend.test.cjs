@@ -22,6 +22,7 @@ function load(file, mocks = {}) {
 
 const schema = load("src/db/schema.ts");
 const security = load("src/lib/security.ts");
+const editorial = load("src/lib/editorial.ts");
 const nextResponse = { NextResponse: { json: (body, init) => Response.json(body, init) } };
 const request = (body) => new Request("https://carriova.test/api/events", {
   method: "POST",
@@ -120,15 +121,21 @@ test("missing DATABASE_URL does not initialize PostgreSQL during module import",
   assert.equal(created, false);
 });
 
-test("public content has empty states without database configuration", async () => {
-  const queries = load("src/lib/queries.ts", { "@/db": dbUnavailable, "@/db/schema": schema });
+test("editorial content remains available without database configuration", async () => {
+  const queries = load("src/lib/queries.ts", { "@/db": dbUnavailable, "@/db/schema": schema, "@/lib/editorial": editorial });
   for (const result of await Promise.all([
-    queries.getPublishedJobs(), queries.getRelatedJobs("missing"), queries.getPublishedPosts(),
+    queries.getPublishedJobs(), queries.getRelatedJobs("missing"),
     queries.getRelatedPosts("missing", "cv"), queries.getFaqs("home"),
     queries.getPricingOffers(), queries.getPublishedTestimonials(),
   ])) assert.deepEqual(result, []);
   assert.equal(await queries.getJobBySlug("missing"), null);
   assert.equal(await queries.getPostBySlug("missing"), null);
+  const article = editorial.editorialPosts.find((post) => post.slug === "organiser-sa-recherche-emploi");
+  assert.ok(article);
+  assert.deepEqual(await queries.getPublishedPosts(), editorial.editorialPosts);
+  assert.equal(await queries.getPostBySlug(article.slug), article);
+  assert.deepEqual(await queries.getPublishedPosts("cv"), []);
+  assert.deepEqual(await queries.getRelatedPosts(article.slug, article.cluster), []);
   assert.deepEqual(await queries.getJobFacets(), {
     locations: [], industries: [], contractTypes: [], experiences: [], workModes: [],
   });
@@ -138,7 +145,7 @@ test("published-only detail queries are parameterized and reject configured data
   const calls = [];
   const database = drizzle({ async query(config, values) { calls.push({ sql: config.text, values }); return { rows: [] }; } }, { schema });
   const queries = load("src/lib/queries.ts", {
-    "@/db": { databaseConfigured: true, getDb: () => database }, "@/db/schema": schema,
+    "@/db": { databaseConfigured: true, getDb: () => database }, "@/db/schema": schema, "@/lib/editorial": editorial,
   });
   await queries.getJobBySlug("private-job");
   await queries.getPostBySlug("private-post");
@@ -148,9 +155,11 @@ test("published-only detail queries are parameterized and reject configured data
     assert.equal(call.values[2], 1);
   }
   const failing = load("src/lib/queries.ts", {
-    "@/db": { databaseConfigured: true, getDb() { throw new Error("offline"); } }, "@/db/schema": schema,
+    "@/db": { databaseConfigured: true, getDb() { throw new Error("offline"); } }, "@/db/schema": schema, "@/lib/editorial": editorial,
   });
   await assert.rejects(failing.getPublishedJobs(), /offline/);
+  await assert.rejects(failing.getPublishedPosts(), /offline/);
+  await assert.rejects(failing.getPostBySlug("organiser-sa-recherche-emploi"), /offline/);
 });
 
 test("event endpoint rejects malformed JSON and wrong field types as client errors", async () => {

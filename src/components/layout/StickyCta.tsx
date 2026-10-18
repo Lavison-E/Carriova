@@ -41,12 +41,12 @@ function ContextualStickyCta({ pathname }: { pathname: string }) {
     };
   }, [pathname]);
 
-  if (pathname.startsWith("/compte") || pathname.startsWith("/contact") || pathname.startsWith("/admin") || pathname.startsWith("/solutions")) return null;
+  if (pathname.startsWith("/qualification") || pathname.startsWith("/compte") || pathname.startsWith("/contact") || pathname.startsWith("/admin") || pathname.startsWith("/solutions")) return null;
   if (pathname === "/" && !heroPassed) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-night/15 bg-[#f7f5ef] px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
-      <ButtonLink href="/solutions" variant="orange" className="w-full justify-between rounded-lg" eventName="cta_click">
+      <ButtonLink href="/qualification" variant="orange" className="w-full justify-between rounded-lg" eventName="cta_click">
         Trouver ma solution <CareerIcon name="arrow" className="h-4 w-4" />
       </ButtonLink>
     </div>
