@@ -1,6 +1,6 @@
 import { countryOptions } from "@/lib/countries";
 
-export const QUALIFICATION_CONSENT_VERSION = "2026-10-18";
+export const QUALIFICATION_CONSENT_VERSION = "2026-10-22";
 export const QUALIFICATION_PRIVACY_NOTICE = "J’accepte que Carriova utilise les informations communiquées pour traiter ma demande et, si je le souhaite, me recontacte au sujet de cette demande.";
 
 export const qualificationOptions = {
@@ -72,7 +72,7 @@ export const qualificationOptions = {
 export const qualificationSteps = [
   { id: "profile", title: "Votre profil", fields: ["fullName", "whatsapp", "country", "profile", "discoverySource"] },
   { id: "need", title: "Votre besoin", fields: ["need", "cvStatus", "timeline", "targetOffer", "difficulty"] },
-  { id: "request", title: "Votre demande", fields: ["budget", "paymentReadiness", "contactWhatsApp", "message", "consentPrivacy", "consentMarketing"] },
+  { id: "request", title: "Votre demande", fields: ["budget", "contactWhatsApp", "message", "consentPrivacy", "consentMarketing"] },
 ] as const;
 
 export type QualificationNeed = (typeof qualificationOptions.need)[number]["value"];
@@ -94,7 +94,8 @@ const legacyCountryLabels: Record<string, string> = {
 
 type OptionKey = keyof typeof qualificationOptions;
 type Answers = { [K in OptionKey]: (typeof qualificationOptions)[K][number]["value"] };
-export type QualificationInput = Omit<Answers, "targetOffer" | "difficulty"> & {
+export type QualificationInput = Omit<Answers, "targetOffer" | "difficulty" | "paymentReadiness"> & {
+  paymentReadiness: "not_asked";
   targetOffer: Answers["targetOffer"] | null;
   difficulty: Answers["difficulty"] | null;
   fullName: string;
@@ -105,6 +106,7 @@ export type QualificationInput = Omit<Answers, "targetOffer" | "difficulty"> & {
 };
 
 export function qualificationLabel(key: OptionKey, value: string | null | undefined) {
+  if (key === "paymentReadiness" && value === "not_asked") return "Non demandé";
   if (key === "country" && value && Object.hasOwn(legacyCountryLabels, value)) return legacyCountryLabels[value];
   return qualificationOptions[key].find((option) => option.value === value)?.label ?? value ?? "Non renseigné";
 }
@@ -136,6 +138,8 @@ export function validateQualification(formData: FormData): {
   if (!whatsapp) fieldErrors.whatsapp = "Indiquez un numéro WhatsApp valide avec son indicatif (ex. +225).";
   const answers: Record<string, string | null> = {};
   for (const key of Object.keys(qualificationOptions) as OptionKey[]) {
+    // Retain historical labels without accepting or inventing a new purchase intention.
+    if (key === "paymentReadiness") { answers[key] = "not_asked"; continue; }
     const value = text(key);
     if (!value && (key === "targetOffer" || key === "difficulty")) {
       answers[key] = null;

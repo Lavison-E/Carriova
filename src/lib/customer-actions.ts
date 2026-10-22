@@ -2,6 +2,8 @@
 import { randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { normalizeWhatsApp, type WhatsAppActionState } from "@/lib/whatsapp";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { databaseConfigured, getDb } from "@/db";
 import { renderTransactionalEmail } from "@/lib/transactional-email.mjs";
@@ -37,7 +39,9 @@ async function makeSession(tx:Tx,user:CustomerIdentity,previous:string|undefined
 }
 export async function customerSignup(_prev:ActionState,fd:FormData):Promise<ActionState>{
  const name=value(fd,"name").trim(),email=value(fd,"email").trim().toLowerCase(),password=value(fd,"password");
+ const whatsapp=normalizeWhatsApp(value(fd,"whatsapp"),value(fd,"whatsappCountry"));
  const errors:Record<string,string>={};
+ if(!whatsapp)errors.whatsapp="Indiquez un numéro WhatsApp valide avec son pays ou son indicatif international.";
  if(name.length<2||name.length>120)errors.name="Indiquez votre nom (2 à 120 caractères).";
  if(!isEmail(email)||email.length>255)errors.email="Indiquez une adresse e-mail valide.";
  if(password.length<8||password.length>256)errors.password="Choisissez un mot de passe de 8 à 256 caractères.";
@@ -49,7 +53,7 @@ export async function customerSignup(_prev:ActionState,fd:FormData):Promise<Acti
   if(!await allowed(email,"signup"))return {ok:false,message:"Trop de tentatives. Réessayez dans quinze minutes."};
   const passwordHash=await hashPassword(password,{minLength:8}),jar=await cookies();
   const token=await getDb().transaction(async tx=>{
-   const [user]=await tx.insert(customerUsers).values({name,email,passwordHash,consentPrivacy:true,consentMarketing:["on","true"].includes(value(fd,"consentMarketing")),consentVersion:"2026-10-18"}).onConflictDoNothing({target:customerUsers.email}).returning({id:customerUsers.id,email:customerUsers.email,name:customerUsers.name});
+   const [user]=await tx.insert(customerUsers).values({name,email,whatsapp,passwordHash,consentPrivacy:true,consentMarketing:["on","true"].includes(value(fd,"consentMarketing")),consentVersion:"2026-10-22"}).onConflictDoNothing({target:customerUsers.email}).returning({id:customerUsers.id,email:customerUsers.email,name:customerUsers.name});
    if(!user)return null;
    return makeSession(tx,user,jar.get(CUSTOMER_COOKIE)?.value,jar.get(CLAIM_COOKIE)?.value);
   });
@@ -164,4 +168,21 @@ export async function customerResetPassword(_prev:ActionState,fd:FormData):Promi
   (await cookies()).set(CUSTOMER_COOKIE,"",{...cookieOptions(),maxAge:0});
   return {ok:true,message:"Votre mot de passe a été modifié. Connectez-vous avec votre nouveau mot de passe."};
  }catch{return unavailable;}
+}
+
+export async function customerUpdateWhatsApp(_previous: WhatsAppActionState, fd: FormData): Promise<WhatsAppActionState> {
+ try {
+  const customer = await requireCustomer();
+  const whatsapp = normalizeWhatsApp(value(fd, "whatsapp"), value(fd, "whatsappCountry"));
+  if (!whatsapp) return { ok: false, message: "Vérifiez votre numéro WhatsApp.", fieldErrors: { whatsapp: "Choisissez le pays et saisissez un numéro valide, national ou international." } };
+  const expected = value(fd, "expectedWhatsApp");
+  if (expected && !/^\+[1-9]\d{7,14}$/.test(expected)) return { ok: false, message: "Rechargez la page pour retrouver votre numéro enregistré." };
+  const [updated] = await getDb().update(customerUsers).set({ whatsapp }).where(and(eq(customerUsers.id, customer.id), eq(customerUsers.enabled, true), expected ? eq(customerUsers.whatsapp, expected) : isNull(customerUsers.whatsapp))).returning({ whatsapp: customerUsers.whatsapp });
+  if (!updated) return { ok: false, message: "Le numéro a changé dans une autre fenêtre. Vos réponses restent affichées ; rechargez la page avant de continuer." };
+  revalidatePath("/espace"); revalidatePath("/espace/compte"); revalidatePath("/espace/profil");
+  return { ok: true, message: "Votre numéro WhatsApp est enregistré.", whatsapp: updated.whatsapp! };
+ } catch (error) {
+  if (error instanceof CustomerUnauthorizedError) redirect("/compte/connexion");
+  return { ok: false, message: "Votre numéro n’a pas pu être enregistré. Réessayez dans un instant." };
+ }
 }

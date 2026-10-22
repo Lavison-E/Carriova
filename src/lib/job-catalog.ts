@@ -19,7 +19,7 @@ const readAccor = unstable_cache(async () => {
     return normalizeAccorPosting(await detail.json(), verifiedAt, now);
   }));
   return { jobs: results.flatMap(result => result.status === "fulfilled" && result.value ? [result.value] : []), verifiedAt, partial: results.some(result => result.status === "rejected") };
-}, ["carriova-accor-ci-v1"], { revalidate: 900 });
+}, ["carriova-accor-ci-v2"], { revalidate: 900 });
 
 export const getOpportunityCatalog = cache(async () => {
   try {

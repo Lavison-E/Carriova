@@ -4,10 +4,13 @@ import { createContext, useActionState, useContext, useEffect, useRef, useState,
 import { CareerIcon } from "@/components/brand/CareerIcon";
 import { formatWorkspaceDate } from "@/components/workspace/WorkspaceUi";
 import type { ActionState } from "@/lib/actions";
-import { addRequestMessage, publishRequestDelivery, removeDraftDelivery, updateServiceRequest, uploadRequestFile } from "@/lib/workspace-actions";
+import { addRequestMessage, publishRequestDelivery, publishRequestReview, removeDraftDelivery, removeDraftReview, sendRequestProposal, updateServiceRequest, uploadRequestFile } from "@/lib/workspace-actions";
 import { staffRequestTransitions, WORKSPACE_FILE_ACCEPT, WORKSPACE_MAX_FILE_BYTES, WORKSPACE_MAX_FILES, workspaceStatusLabel, type WorkspaceMessage, type WorkspaceRequestDetail, type WorkspaceStatus } from "@/lib/workspace";
 
 type ManagedRequest = Pick<WorkspaceRequestDetail, "id" | "version" | "status" | "quotedAmount" | "dueAt"> & {
+  reviewCount: number;
+  unpublishedReviewCount: number;
+  publishableReviewCount: number;
   briefCount: number;
   deliveryCount: number;
   unpublishedCount: number;
@@ -39,7 +42,7 @@ function FieldError({ state, name, prefix = "order" }: { state: ActionState; nam
   return state.fieldErrors?.[name] ? <span id={`${prefix}-${name}-error`} className="mt-2 block text-xs font-normal leading-5 text-orange">{state.fieldErrors[name]}</span> : null;
 }
 function draftFrom(request: ManagedRequest) {
-  return { version: request.version, status: request.status, amount: request.quotedAmount?.toString() ?? "", due: request.dueAt?.slice(0, 16) ?? "", note: "" };
+  return { version: request.version, status: (["received", "reviewing", "quoted"].includes(request.status) ? "quoted" : request.status) as WorkspaceStatus, amount: request.quotedAmount?.toString() ?? "", due: request.dueAt?.slice(0, 16) ?? "", note: "" };
 }
 
 export function OrderManager({ request, children }: { request: ManagedRequest; children: ReactNode }) {
@@ -56,7 +59,8 @@ export function OrderManager({ request, children }: { request: ManagedRequest; c
   const [state, action, pending] = useActionState(async (previous: ActionState, data: FormData) => {
     start();
     try {
-      const result = await updateServiceRequest(previous, data);
+      const proposal = ["received", "reviewing", "quoted"].includes(request.status) && data.get("status") === "quoted";
+      const result = await (proposal ? sendRequestProposal : updateServiceRequest)(previous, data);
       if (result.ok) setDraft((current) => ({ ...current, version: Number(data.get("version")) + 1, note: "" }));
       return result;
     } finally { finish(); }
@@ -66,14 +70,16 @@ export function OrderManager({ request, children }: { request: ManagedRequest; c
   const priceEditable = ["received", "reviewing", "quoted"].includes(request.status);
   const stale = draft.version !== request.version && !busy;
   const availableStatuses = Array.from(new Set([draft.status, request.status, ...staffRequestTransitions[request.status]]))
-    .filter((status) => status !== "delivered" || request.status === "delivered");
+    .filter((status) => priceEditable ? status === "quoted" || status === "cancelled" : !["delivered", "awaiting_validation", "finalized", "quoted"].includes(status) || status === request.status);
   const stageHelp: Record<WorkspaceStatus, string> = {
     received: "Commencez par étudier le besoin et les documents du client.",
     reviewing: "Précisez le montant et l’échéance, puis envoyez votre proposition au client.",
     quoted: "La proposition attend l’accord du client. Son acceptation fera passer la commande en cours.",
-    in_progress: "Utilisez le bloc de livraison en haut du dossier pour joindre et publier le produit final.",
+    in_progress: "Préparez une version de travail, puis soumettez-la au client pour validation intermédiaire.",
+    awaiting_validation: "Le client examine la version de travail. Son accord finalise la réalisation et ouvre la livraison.",
+    finalized: "Le client a validé le travail. Joignez maintenant les produits définitifs et publiez la livraison.",
     delivered: "Le client peut valider la livraison ou demander des ajustements depuis son espace.",
-    revision_requested: "Consultez les ajustements demandés et ajoutez une nouvelle version du produit avant de livrer à nouveau.",
+    revision_requested: "Consultez les ajustements demandés, reprenez la réalisation puis soumettez une nouvelle version au client.",
     completed: "Le client a validé la livraison. La conversation reste accessible pour les échanges de suivi.",
     cancelled: "Cette commande est annulée. La conversation et les documents existants restent consultables.",
   };
@@ -81,13 +87,13 @@ export function OrderManager({ request, children }: { request: ManagedRequest; c
   return <OrderMutationContext.Provider value={{ busy, start, finish, committed }}>
     <div className="mt-8 space-y-7">
       <Feedback state={notice} />
-      <OrderDelivery request={request} />
+      <OrderDelivery key={`${request.id}-${request.status}`} request={request} />
       <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-7">{children}</div>
         <div className="min-w-0 space-y-7">
     <section className="rounded-xl border border-line bg-white p-5 sm:p-7" aria-labelledby="order-management-title">
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">Traitement de la commande</p>
-      <h2 id="order-management-title" className="mt-3 text-xl font-semibold tracking-tight">La prochaine étape</h2>
+      <h2 id="order-management-title" className="mt-3 text-xl font-semibold tracking-tight">{priceEditable ? "Votre proposition tarifée" : "La prochaine étape"}</h2>
       <p className="mt-3 text-xs leading-6 text-muted">{stageHelp[request.status]}</p>
       {closed ? <p className="mt-5 rounded-lg bg-paper px-4 py-3 text-sm font-medium text-night">{workspaceStatusLabel(request.status)}</p> : <form action={action} onReset={(event) => event.preventDefault()} aria-busy={pending} className="mt-6 space-y-5">
         <input type="hidden" name="requestId" value={request.id} />
@@ -96,13 +102,13 @@ export function OrderManager({ request, children }: { request: ManagedRequest; c
         <Feedback state={state} />
         {stale ? <div role="alert" className="rounded-lg border border-orange/30 bg-[#fff7f0] p-4 text-xs leading-6 text-night">Une autre mise à jour a été enregistrée. Vos choix et votre message restent affichés. Copiez votre texte avant de <a href={`/admin/commandes/${request.id}`} className="font-semibold underline underline-offset-4">recharger la commande</a>.</div> : null}
         <fieldset disabled={busy} className="min-w-0 space-y-5">
-          <label className="block text-xs font-semibold">Étape de traitement<select name="status" value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as WorkspaceStatus }))} aria-invalid={state.fieldErrors?.status ? true : undefined} aria-describedby={state.fieldErrors?.status ? "order-status-error" : undefined} className={inputClass}>{availableStatuses.map((status) => <option key={status} value={status}>{workspaceStatusLabel(status)}</option>)}</select><FieldError state={state} name="status" /></label>
-          <label className="block text-xs font-semibold">Montant proposé <span className="font-normal text-muted">(FCFA / XOF)</span><input name="quoteAmountXOF" type="number" inputMode="numeric" min={0} max={2147483647} step={1} value={draft.amount} readOnly={!priceEditable} onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value }))} aria-invalid={state.fieldErrors?.quoteAmountXOF ? true : undefined} aria-describedby={state.fieldErrors?.quoteAmountXOF ? "order-quoteAmountXOF-error" : "order-price-help"} className={`${inputClass} read-only:bg-paper read-only:text-muted`} /><span id="order-price-help" className="mt-2 block text-[11px] font-normal leading-5 text-muted">{priceEditable ? "Indiquez 0 pour une prestation offerte. L’envoi d’une proposition ne déclenche aucun paiement." : "Ce montant a été accepté par le client et reste inchangé."}</span><FieldError state={state} name="quoteAmountXOF" /></label>
+          <label className="block text-xs font-semibold">{priceEditable ? "Action à effectuer" : "Étape de traitement"}<select name="status" value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as WorkspaceStatus }))} aria-invalid={state.fieldErrors?.status ? true : undefined} aria-describedby={state.fieldErrors?.status ? "order-status-error" : undefined} className={inputClass}>{availableStatuses.map((status) => <option key={status} value={status}>{status === "quoted" ? "Envoyer la proposition au client" : workspaceStatusLabel(status)}</option>)}</select><FieldError state={state} name="status" /></label>
+          <label className="block text-xs font-semibold">Montant proposé <span className="font-normal text-muted">(FCFA / XOF)</span><input name="quoteAmountXOF" type="number" required={priceEditable && draft.status === "quoted"} inputMode="numeric" min={0} max={2147483647} step={1} value={draft.amount} readOnly={!priceEditable} onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value }))} aria-invalid={state.fieldErrors?.quoteAmountXOF ? true : undefined} aria-describedby={state.fieldErrors?.quoteAmountXOF ? "order-quoteAmountXOF-error" : "order-price-help"} className={`${inputClass} read-only:bg-paper read-only:text-muted`} /><span id="order-price-help" className="mt-2 block text-[11px] font-normal leading-5 text-muted">{priceEditable ? "Indiquez 0 pour une prestation offerte. L’envoi d’une proposition ne déclenche aucun paiement." : "Ce montant a été accepté par le client et reste inchangé."}</span><FieldError state={state} name="quoteAmountXOF" /></label>
           <label className="block text-xs font-semibold">Échéance proposée <span className="font-normal text-muted">(UTC / Abidjan)</span><input type="datetime-local" value={draft.due} onChange={(event) => setDraft((current) => ({ ...current, due: event.target.value }))} aria-invalid={state.fieldErrors?.dueAt ? true : undefined} aria-describedby={state.fieldErrors?.dueAt ? "order-dueAt-error" : undefined} className={inputClass} /><FieldError state={state} name="dueAt" /></label>
           {draft.due ? <button type="button" onClick={() => setDraft((current) => ({ ...current, due: "" }))} className="min-h-8 text-xs text-muted underline underline-offset-4">Retirer l’échéance</button> : null}
           <label className="block text-xs font-semibold">Message au client <span className="font-normal text-muted">{draft.status === "cancelled" ? "(motif requis)" : "(facultatif)"}</span><textarea name="note" rows={4} maxLength={5000} minLength={draft.status === "cancelled" ? 3 : undefined} required={draft.status === "cancelled"} value={draft.note} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} aria-invalid={state.fieldErrors?.note ? true : undefined} aria-describedby={state.fieldErrors?.note ? "order-note-error order-note-help" : "order-note-help"} placeholder="Expliquez votre proposition ou la prochaine étape…" className={`${inputClass} resize-y leading-6`} /><span id="order-note-help" className="mt-2 block text-[11px] font-normal leading-5 text-muted">Ce message apparaît dans la conversation du client.</span><FieldError state={state} name="note" /></label>
         </fieldset>
-        <button type="submit" disabled={busy || stale} className={submitClass}>{pending ? "Enregistrement…" : draft.status === "quoted" && request.status !== "quoted" ? "Envoyer la proposition" : "Enregistrer les modifications"}<CareerIcon name="arrow" className="h-4 w-4 shrink-0" /></button>
+        <button type="submit" disabled={busy || stale} className={submitClass}>{pending ? "Enregistrement…" : priceEditable && draft.status === "quoted" ? "Envoyer la proposition tarifée" : "Enregistrer les modifications"}<CareerIcon name="arrow" className="h-4 w-4 shrink-0" /></button>
       </form>}
     </section>
 
@@ -120,53 +126,57 @@ export function OrderManager({ request, children }: { request: ManagedRequest; c
 
 function OrderDelivery({ request }: { request: ManagedRequest }) {
   const mutation = useOrderMutation();
+  const review = request.status === "in_progress";
+  const kind = review ? "review" : "delivery";
+  const count = review ? request.reviewCount : request.deliveryCount;
+  const unpublished = review ? request.unpublishedReviewCount : request.unpublishedCount;
   const [note, setNote] = useState("");
   const [state, action, pending] = useActionState(async (previous: ActionState, data: FormData) => {
     mutation.start();
     try {
-      const result = await publishRequestDelivery(previous, data);
+      const result = await (review ? publishRequestReview : publishRequestDelivery)(previous, data);
       if (result.ok) {
         setNote("");
-        mutation.committed(Number(data.get("version")), result, "delivered");
+        mutation.committed(Number(data.get("version")), result, review ? "awaiting_validation" : "delivered");
       }
       return result;
     } finally { mutation.finish(); }
   }, initialState);
-  const canDeliver = request.status === "in_progress" || request.status === "revision_requested";
+  const canDeliver = review || request.status === "finalized";
   if (!canDeliver) return null;
-  const canPublish = request.publishableCount > 0;
+  const canPublish = (review ? request.publishableReviewCount : request.publishableCount) > 0;
   const busy = mutation.busy || pending;
 
   return <section className="overflow-hidden rounded-xl border border-night/15 bg-white" aria-labelledby="order-delivery-title">
     <div className="bg-night px-5 py-6 text-white sm:px-7 sm:py-7">
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
-        <div className="max-w-2xl"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#ffc7a1]">La livraison, en deux étapes</p><h2 id="order-delivery-title" className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Livrer le produit au client</h2><p className="mt-3 text-sm leading-7 text-white/75">Joignez les fichiers terminés, vérifiez-les, puis publiez la livraison. Le client pourra les télécharger, les valider ou demander une retouche.</p></div>
-        <a href="#order-deliverables" className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-white/25 px-4 text-xs font-semibold hover:bg-white/10">Vérifier les fichiers préparés <span aria-hidden="true" className="ml-3">↓</span></a>
+        <div className="max-w-2xl"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#ffc7a1]">{review ? "03 / Validation du travail" : "04 / Livraison"}</p><h2 id="order-delivery-title" className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">{review ? "Faire valider la version de travail" : "Livrer le produit au client"}</h2><p className="mt-3 text-sm leading-7 text-white/75">{review ? "Joignez votre version de travail et demandez l’accord du client avant de préparer les fichiers définitifs." : "Le travail est validé. Joignez les fichiers définitifs : le client les retrouvera dans son espace pour confirmer leur réception."}</p></div>
+        <a href={review ? "#order-reviews" : "#order-deliverables"} className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-white/25 px-4 text-xs font-semibold hover:bg-white/10">Vérifier les fichiers préparés <span aria-hidden="true" className="ml-3">↓</span></a>
       </div>
-      <dl className="mt-6 flex flex-wrap gap-x-8 gap-y-3 border-t border-white/15 pt-5 text-xs"><div className="flex items-baseline gap-2"><dt className="text-white/70">En préparation</dt><dd className="text-lg font-semibold">{request.unpublishedCount}</dd></div><div className="flex items-baseline gap-2"><dt className="text-white/70">Déjà publiés</dt><dd className="text-lg font-semibold">{request.deliveryCount - request.unpublishedCount}</dd></div></dl>
+      <dl className="mt-6 flex flex-wrap gap-x-8 gap-y-3 border-t border-white/15 pt-5 text-xs"><div className="flex items-baseline gap-2"><dt className="text-white/70">En préparation</dt><dd className="text-lg font-semibold">{unpublished}</dd></div><div className="flex items-baseline gap-2"><dt className="text-white/70">Déjà publiés</dt><dd className="text-lg font-semibold">{count - unpublished}</dd></div></dl>
     </div>
     <div className="grid lg:grid-cols-2">
       <div className="min-w-0 border-b border-line p-5 sm:p-7 lg:border-b-0 lg:border-r">
-        <h3 className="flex items-center gap-3 text-base font-semibold"><span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper text-sm">1</span>Joindre le produit</h3>
+        <h3 className="flex items-center gap-3 text-base font-semibold"><span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper text-sm">1</span>{review ? "Joindre la version de travail" : "Joindre le produit"}</h3>
         <p className="mt-3 text-xs leading-6 text-muted">Ajoutez un fichier à la fois. Les produits restent visibles uniquement par l’équipe jusqu’à leur publication.</p>
-        <div className="mt-5"><OrderFileUpload requestId={request.id} kind="delivery" version={request.version} count={request.deliveryCount} /></div>
+        <div className="mt-5"><OrderFileUpload requestId={request.id} kind={kind} version={request.version} count={count} /></div>
       </div>
       <div className="min-w-0 p-5 sm:p-7">
-        <h3 className="flex items-center gap-3 text-base font-semibold"><span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper text-sm">2</span>Publier la livraison au client</h3>
-        <p className="mt-3 text-xs leading-6 text-muted">La publication rend les produits préparés accessibles dans son espace. Une notification par e-mail est prévue ; son suivi est disponible dans Notifications.</p>
+        <h3 className="flex items-center gap-3 text-base font-semibold"><span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper text-sm">2</span>{review ? "Demander la validation du client" : "Publier la livraison au client"}</h3>
+        <p className="mt-3 text-xs leading-6 text-muted">{review ? "Le client pourra consulter les fichiers, approuver le travail ou demander des ajustements. La livraison finale restera une étape distincte." : "La publication rend les produits préparés accessibles dans son espace. Une notification par e-mail est prévue ; son suivi est disponible dans Notifications."}</p>
         <form action={action} onReset={(event) => event.preventDefault()} aria-busy={pending} className="mt-5 space-y-4">
           <input type="hidden" name="requestId" value={request.id} /><input type="hidden" name="version" value={request.version} />
           {!state.ok ? <Feedback state={state} /> : null}
-          <label className="block text-xs font-semibold">Note de livraison <span className="font-normal text-muted">(facultatif)</span><textarea name="note" rows={3} maxLength={5000} disabled={busy} value={note} onChange={(event) => setNote(event.target.value)} aria-invalid={state.fieldErrors?.note ? true : undefined} aria-describedby={state.fieldErrors?.note ? "delivery-note-help delivery-note-error" : "delivery-note-help"} placeholder="Présentez les fichiers ou indiquez comment les utiliser…" className={`${inputClass} resize-y leading-6`} /><span id="delivery-note-help" className="mt-2 block text-[11px] font-normal leading-5 text-muted">Cette note sera visible dans la conversation du client.</span><FieldError state={state} name="note" prefix="delivery" /></label>
-          {!canPublish ? <p className="rounded-lg bg-paper px-4 py-3 text-xs leading-6 text-muted">{request.status === "revision_requested" ? "Ajoutez une nouvelle version du produit après la dernière demande de retouche pour pouvoir publier." : "Joignez d’abord au moins un produit à livrer."}</p> : <p className="text-xs leading-6 text-muted">{request.unpublishedCount} fichier{request.unpublishedCount > 1 ? "s" : ""} en préparation. Vérifiez leur contenu avant de publier.</p>}
-          <button type="submit" disabled={busy || !canPublish} className={submitClass}>{pending ? "Publication en cours…" : "Publier la livraison au client"}<CareerIcon name="arrow" className="h-4 w-4 shrink-0" /></button>
+          <label className="block text-xs font-semibold">{review ? "Message de validation" : "Note de livraison"} <span className="font-normal text-muted">(facultatif)</span><textarea name="note" rows={3} maxLength={5000} disabled={busy} value={note} onChange={(event) => setNote(event.target.value)} aria-invalid={state.fieldErrors?.note ? true : undefined} aria-describedby={state.fieldErrors?.note ? "delivery-note-help delivery-note-error" : "delivery-note-help"} placeholder="Présentez les fichiers ou indiquez comment les utiliser…" className={`${inputClass} resize-y leading-6`} /><span id="delivery-note-help" className="mt-2 block text-[11px] font-normal leading-5 text-muted">Cette note sera visible dans la conversation du client.</span><FieldError state={state} name="note" prefix="delivery" /></label>
+          {!canPublish ? <p className="rounded-lg bg-paper px-4 py-3 text-xs leading-6 text-muted">Ajoutez au moins un fichier après la dernière demande de retouche pour pouvoir publier.</p> : <p className="text-xs leading-6 text-muted">{unpublished} fichier{unpublished > 1 ? "s" : ""} en préparation. Vérifiez leur contenu avant de publier.</p>}
+          <button type="submit" disabled={busy || !canPublish} className={submitClass}>{pending ? "Publication en cours…" : review ? "Envoyer pour validation" : "Publier la livraison au client"}<CareerIcon name="arrow" className="h-4 w-4 shrink-0" /></button>
         </form>
       </div>
     </div>
   </section>;
 }
 
-function OrderFileUpload({ requestId, version, kind, count, closed = false }: { requestId: number; version: number; kind: "brief" | "delivery"; count: number; closed?: boolean }) {
+function OrderFileUpload({ requestId, version, kind, count, closed = false }: { requestId: number; version: number; kind: "brief" | "review" | "delivery"; count: number; closed?: boolean }) {
   const mutation = useOrderMutation();
   const fileRef = useRef<HTMLInputElement>(null);
   const [localError, setLocalError] = useState("");
@@ -176,7 +186,7 @@ function OrderFileUpload({ requestId, version, kind, count, closed = false }: { 
       const result = await uploadRequestFile(previous, data);
       if (result.ok) {
         if (fileRef.current) fileRef.current.value = "";
-        if (kind === "delivery") mutation.committed(Number(data.get("version")), result);
+        if (kind !== "brief") mutation.committed(Number(data.get("version")), result);
       }
       return result;
     } finally { mutation.finish(); }
@@ -193,24 +203,24 @@ function OrderFileUpload({ requestId, version, kind, count, closed = false }: { 
   }
   return <div className="space-y-4">
     {kind === "brief" || !state.ok ? <Feedback state={state} /> : null}
-    {closed || full ? <p className="rounded-lg bg-paper px-4 py-3 text-xs leading-6 text-muted">{closed ? "La commande est clôturée. Les documents déjà déposés restent disponibles." : kind === "delivery" ? "Les 12 emplacements de produits sont utilisés. Vous pouvez retirer un fichier en préparation pour en joindre un autre. Les produits déjà publiés restent conservés." : "La limite de 12 documents de travail est atteinte. Les emplacements des produits à livrer restent indépendants."}</p> : <form action={action} onSubmit={checkFile} onReset={(event) => event.preventDefault()} aria-busy={pending} className="space-y-4">
+    {closed || full ? <p className="rounded-lg bg-paper px-4 py-3 text-xs leading-6 text-muted">{closed ? "La commande est clôturée. Les documents déjà déposés restent disponibles." : kind !== "brief" ? "Les 12 emplacements de produits sont utilisés. Vous pouvez retirer un fichier en préparation pour en joindre un autre. Les produits déjà publiés restent conservés." : "La limite de 12 documents de travail est atteinte. Les emplacements des produits à livrer restent indépendants."}</p> : <form action={action} onSubmit={checkFile} onReset={(event) => event.preventDefault()} aria-busy={pending} className="space-y-4">
       <input type="hidden" name="context" value="team" /><input type="hidden" name="requestId" value={requestId} /><input type="hidden" name="kind" value={kind} /><input type="hidden" name="version" value={version} />
       <fieldset disabled={mutation.busy || pending} className="min-w-0 space-y-3">
-        <label className="block text-xs font-semibold">{kind === "delivery" ? "Fichier du produit" : "Document de travail"}<input ref={fileRef} name="file" type="file" required accept={WORKSPACE_FILE_ACCEPT} onChange={() => setLocalError("")} aria-invalid={localError || state.fieldErrors?.file ? true : undefined} aria-describedby={`${prefix}-help ${prefix}-error`} className="mt-3 block w-full min-w-0 rounded-lg border border-line p-2 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-paper file:px-3 file:py-3 file:text-xs file:font-semibold file:text-night" /></label>
-        <p id={`${prefix}-help`} className="text-[11px] leading-6 text-muted">PDF, DOCX, JPG ou PNG · 3 Mo maximum par fichier.<br />{count} / {WORKSPACE_MAX_FILES} {kind === "delivery" ? "produits joints, préparés et publiés" : "documents de travail"}.</p>
+        <label className="block text-xs font-semibold">{kind !== "brief" ? "Fichier du produit" : "Document de travail"}<input ref={fileRef} name="file" type="file" required accept={WORKSPACE_FILE_ACCEPT} onChange={() => setLocalError("")} aria-invalid={localError || state.fieldErrors?.file ? true : undefined} aria-describedby={`${prefix}-help ${prefix}-error`} className="mt-3 block w-full min-w-0 rounded-lg border border-line p-2 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-paper file:px-3 file:py-3 file:text-xs file:font-semibold file:text-night" /></label>
+        <p id={`${prefix}-help`} className="text-[11px] leading-6 text-muted">PDF, DOCX, JPG ou PNG · 3 Mo maximum par fichier.<br />{count} / {WORKSPACE_MAX_FILES} {kind !== "brief" ? "produits joints, préparés et publiés" : "documents de travail"}.</p>
         <p id={`${prefix}-error`} role={localError ? "alert" : undefined} className="text-xs leading-5 text-orange">{localError || state.fieldErrors?.file}</p>
       </fieldset>
-      <button type="submit" disabled={mutation.busy || pending} className="inline-flex min-h-12 w-full items-center justify-between gap-4 rounded-lg bg-night px-5 py-3 text-left text-sm font-semibold text-white hover:bg-royal disabled:cursor-not-allowed disabled:opacity-60">{pending ? "Dépôt en cours…" : kind === "delivery" ? "Joindre à la préparation" : "Ajouter au dossier"}<CareerIcon name="document" className="h-4 w-4 shrink-0" /></button>
+      <button type="submit" disabled={mutation.busy || pending} className="inline-flex min-h-12 w-full items-center justify-between gap-4 rounded-lg bg-night px-5 py-3 text-left text-sm font-semibold text-white hover:bg-royal disabled:cursor-not-allowed disabled:opacity-60">{pending ? "Dépôt en cours…" : kind !== "brief" ? "Joindre à la préparation" : "Ajouter au dossier"}<CareerIcon name="document" className="h-4 w-4 shrink-0" /></button>
     </form>}
   </div>;
 }
 
-export function DraftDeliveryRemoveButton({ requestId, fileId, version, filename }: { requestId: number; fileId: number; version: number; filename: string }) {
+export function DraftDeliveryRemoveButton({ requestId, fileId, version, filename, kind = "delivery" }: { requestId: number; fileId: number; version: number; filename: string; kind?: "review" | "delivery" }) {
   const mutation = useOrderMutation();
   const [state, action, pending] = useActionState(async (previous: ActionState, data: FormData) => {
     mutation.start();
     try {
-      const result = await removeDraftDelivery(previous, data);
+      const result = await (kind === "review" ? removeDraftReview : removeDraftDelivery)(previous, data);
       if (result.ok) mutation.committed(Number(data.get("version")), result);
       return result;
     } finally { mutation.finish(); }

@@ -75,13 +75,26 @@ test("private customer workspace PostgreSQL integration", async (t) => {
       quoteAmountXOF: current.quotedAmount === null ? "" : String(current.quotedAmount), dueAt: current.dueAt ?? "", ...extra }));
   };
 
+  async function approveWorkingVersion(id) {
+    let current = await queries.getTeamRequest(id);
+    assert.equal((await actions.uploadRequestFile(initial, upload(id, { context: "team", kind: "review", version: String(current.version), file: new File([pdf], "version-travail.pdf") }))).ok, true);
+    current = await queries.getTeamRequest(id);
+    assert.equal((await actions.publishRequestReview(initial, form({ requestId: String(id), version: String(current.version) }))).ok, true);
+    current = await queries.getTeamRequest(id);
+    assert.equal((await actions.customerRequestAction(initial, form({ requestId: String(id), version: String(current.version), action: "approve_review" }))).ok, true);
+  }
+
   await t.test("additive migration requires existing schemas and remains repeatable", async () => {
     await assert.rejects(pg.exec(migration), /customer_users/);
     await pg.exec(CORE_LEADS_SQL);
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_staff.sql"), "utf8"));
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_customer.sql"), "utf8"));
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261022_career_profile.sql"), "utf8"));
     await pg.exec(migration);
     await pg.exec(migration);
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_notifications.sql"), "utf8"));
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261022_workflow.sql"), "utf8"));
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261022_workflow.sql"), "utf8"));
     await pg.exec("INSERT INTO customer_users(id,email,name,password_hash,consent_privacy,consent_version) VALUES (1,'awa@example.test','Awa','test-only',true,'test'),(2,'koffi@example.test','Koffi','test-only',true,'test')");
     assert.equal((await pg.query("SELECT count(*)::integer AS total FROM customer_users")).rows[0].total, 2);
   });
@@ -113,6 +126,11 @@ test("private customer workspace PostgreSQL integration", async (t) => {
     assert.ok(Number.isSafeInteger(requestId));
     const persisted = (await pg.query("SELECT customer_id,status,quoted_amount FROM service_requests WHERE id=$1", [requestId])).rows[0];
     assert.deepEqual(persisted, { customer_id: 1, status: "received", quoted_amount: null });
+    staffEnabled = true;
+    assert.equal((await queries.getTeamRequest(requestId)).customerWhatsApp, null);
+    await pg.query("UPDATE customer_users SET whatsapp='+2250700000000' WHERE id=1");
+    assert.equal((await queries.getTeamRequest(requestId)).customerWhatsApp, "+2250700000000");
+    staffEnabled = false;
     const own = await queries.getCustomerRequest(requestId);
     assert.equal(own.events.length, 1);
     assert.equal(own.customerEmail, customers[0].email);
@@ -168,7 +186,7 @@ test("private customer workspace PostgreSQL integration", async (t) => {
 
   await t.test("a quote is explicit, acceptance belongs to the customer and stale edits cannot overwrite it", async () => {
     staffEnabled = true;
-    assert.equal((await teamUpdate({ status: "quoted", quoteAmountXOF: "7000" })).ok, false);
+    assert.equal((await teamUpdate({ status: "in_progress", quoteAmountXOF: "7000" })).ok, false);
     assert.equal((await teamUpdate({ status: "reviewing" })).ok, true);
     assert.equal((await teamUpdate({ status: "quoted" })).ok, false);
     assert.equal((await teamUpdate({ status: "quoted", quoteAmountXOF: "0", note: "Cette prestation vous est offerte." })).ok, true);
@@ -189,11 +207,12 @@ test("private customer workspace PostgreSQL integration", async (t) => {
     const unpublished = await detail();
     const noFile = await actions.publishRequestDelivery(initial, form({ requestId: String(requestId), version: String(unpublished.version) }));
     assert.equal(noFile.ok, false);
-    assert.match(noFile.message, /fichier de livraison/);
+    assert.match(noFile.message, /valider la réalisation/);
     assert.equal((await detail()).version, unpublished.version);
   });
 
   await t.test("delivery files stay hidden until delivery, revisions require a new file and the client closes the request", async () => {
+    await approveWorkingVersion(requestId);
     assert.equal((await actions.uploadRequestFile(initial, upload(requestId, { kind: "delivery" }))).ok, false);
     const beforeUpload = await detail();
     assert.equal((await uploadDelivery(requestId, { file: new File([pdf], "cv-final.pdf") })).ok, true);
@@ -242,6 +261,8 @@ test("private customer workspace PostgreSQL integration", async (t) => {
     assert.equal((await actions.publishRequestDelivery(initial, form(revisionData))).ok, false);
     assert.equal((await uploadDelivery(requestId, { file: new File([pdf], "cv-revise.pdf") })).ok, true);
     assert.equal((await actions.publishRequestDelivery(initial, form({ ...revisionData, version: String(prepared.version) }))).ok, false);
+    assert.equal((await teamUpdate({ status: "in_progress" })).ok, true);
+    await approveWorkingVersion(requestId);
     // The general team update uses the same validation as the dedicated publication action.
     assert.equal((await teamUpdate({ status: "delivered" })).ok, true);
     current = await detail();
@@ -267,7 +288,7 @@ test("private customer workspace PostgreSQL integration", async (t) => {
   await t.test("failed delivery notes roll back publication, event and notification scheduling", async () => {
     const created = await actions.createServiceRequest(initial, form({ title: "Livraison atomique", service: "first_cv", brief: "Une demande pour vérifier la publication." }));
     const id = created.requestId;
-    await pg.query("UPDATE service_requests SET status='in_progress',quoted_amount=7000 WHERE id=$1", [id]);
+    await pg.query("UPDATE service_requests SET status='finalized',quoted_amount=7000 WHERE id=$1", [id]);
     assert.equal((await uploadDelivery(id)).ok, true);
     await pg.exec("ALTER TABLE request_messages ADD CONSTRAINT test_reject_delivery_note CHECK (body <> 'Rollback delivery') NOT VALID");
     const before = notifications.length;
@@ -276,7 +297,7 @@ test("private customer workspace PostgreSQL integration", async (t) => {
       const result = await actions.publishRequestDelivery(initial, form({ requestId: String(id), version: String(prepared.version), note: "Rollback delivery" }));
       assert.equal(result.ok, false);
       const current = await queries.getTeamRequest(id);
-      assert.equal(current.status, "in_progress");
+      assert.equal(current.status, "finalized");
       assert.equal(current.version, prepared.version);
       assert.equal(current.events.filter((event) => event.type === "delivered").length, 0);
       assert.equal(current.messages.length, 0);
@@ -287,7 +308,7 @@ test("private customer workspace PostgreSQL integration", async (t) => {
   await t.test("removing a draft deletes only that unpublished file and invalidates stale publication versions", async () => {
     const created = await actions.createServiceRequest(initial, form({ title: "Corriger un brouillon", service: "first_cv", brief: "Une demande pour vérifier le retrait des brouillons." }));
     const id = created.requestId;
-    await pg.query("UPDATE service_requests SET status='in_progress',quoted_amount=7000 WHERE id=$1", [id]);
+    await pg.query("UPDATE service_requests SET status='finalized',quoted_amount=7000 WHERE id=$1", [id]);
     assert.equal((await uploadDelivery(id, { file: new File([pdf], "draft-error.pdf") })).ok, true);
     assert.equal((await uploadDelivery(id, { file: new File([pdf], "draft-correct.pdf") })).ok, true);
     const prepared = await queries.getTeamRequest(id);
@@ -304,7 +325,7 @@ test("private customer workspace PostgreSQL integration", async (t) => {
     assert.equal(remaining.files[0].filename, "draft-correct.pdf");
     assert.equal(remaining.version, prepared.version + 1);
     assert.equal(remaining.quotedAmount, 7000);
-    assert.equal(remaining.status, "in_progress");
+    assert.equal(remaining.status, "finalized");
     const stale = await actions.publishRequestDelivery(initial, form({ requestId: String(id), version: String(prepared.version) }));
     assert.equal(stale.ok, false); assert.match(stale.message, /modifiée/);
     assert.equal((await actions.publishRequestDelivery(initial, form({ requestId: String(id), version: String(remaining.version) }))).ok, true);
@@ -315,14 +336,14 @@ test("private customer workspace PostgreSQL integration", async (t) => {
     const results = await Promise.all(Array.from({ length: 14 }, () => actions.uploadRequestFile(initial, upload(created.requestId))));
     assert.equal(results.filter((result) => result.ok).length, 12);
     assert.equal((await queries.getCustomerRequest(created.requestId)).files.length, 12);
-    await pg.query("UPDATE service_requests SET status='in_progress',quoted_amount=0 WHERE id=$1", [created.requestId]);
+    await pg.query("UPDATE service_requests SET status='finalized',quoted_amount=0 WHERE id=$1", [created.requestId]);
     for (let round = 0; round < workspace.WORKSPACE_MAX_FILES; round++) {
       const current = await queries.getTeamRequest(created.requestId);
       const attempts = await Promise.all(Array.from({ length: 2 }, () => actions.uploadRequestFile(initial, upload(created.requestId, { context: "team", kind: "delivery", version: String(current.version) }))));
       assert.equal(attempts.filter((result) => result.ok).length, 1, "stale concurrent uploads cannot alter reviewed drafts");
     }
     const full = await uploadDelivery(created.requestId);
-    assert.equal(full.ok, false); assert.match(full.message, /12 fichiers de livraison/);
+    assert.equal(full.ok, false); assert.match(full.message, /12 fichiers de ce type/);
     assert.equal((await queries.getTeamRequest(created.requestId)).files.length, 24);
     assert.equal((await queries.getCustomerRequest(created.requestId)).files.length, 12, "prepared deliveries stay private");
     const prepared = await queries.getTeamRequest(created.requestId);
@@ -333,9 +354,10 @@ test("private customer workspace PostgreSQL integration", async (t) => {
 
   await t.test("dedicated publication enqueues delivery and optional note through real transactional outbox triggers", async () => {
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_notifications.sql"), "utf8"));
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261022_workflow.sql"), "utf8"));
     const created = await actions.createServiceRequest(initial, form({ title: "Vérification des notifications", service: "first_cv", brief: "Cette demande vérifie les notifications après publication." }));
     const id = created.requestId;
-    await pg.query("UPDATE service_requests SET status='in_progress',quoted_amount=0 WHERE id=$1", [id]);
+    await pg.query("UPDATE service_requests SET status='finalized',quoted_amount=0 WHERE id=$1", [id]);
     assert.equal((await uploadDelivery(id)).ok, true);
     const prepared = await queries.getTeamRequest(id);
     const privateNote = "Note privée uniquement consultable dans le dossier authentifié.";
@@ -350,6 +372,111 @@ test("private customer workspace PostgreSQL integration", async (t) => {
     assert.equal(jobs[1].message_id, delivered.messages.find((message) => message.body === privateNote).id);
     assert.equal(JSON.stringify(jobs).includes(privateNote), false);
     assert.ok(jobs.every((job) => job.payload === null));
+  });
+
+  await t.test("five-stage workflow requires price approval and a separate client review before final delivery", async () => {
+    const created = await actions.createServiceRequest(initial, form({ title: "Parcours complet", service: "first_cv", brief: "Créer mon premier CV avec validation de chaque étape." }));
+    assert.equal(created.ok, true, created.message); const id = created.requestId;
+    const current = () => queries.getTeamRequest(id);
+    const fields = async extra => ({ requestId: String(id), version: String((await current()).version), ...extra });
+    const proposal = async extra => actions.sendRequestProposal(initial, form(await fields({ quoteAmountXOF: "12000", dueAt: "", note: "Proposition initiale", ...extra })));
+    const decision = async (action, note = "") => actions.customerRequestAction(initial, form(await fields({ action, note })));
+    const update = async status => {
+      const row = await current();
+      return actions.updateServiceRequest(initial, form(await fields({ status, quoteAmountXOF: String(row.quotedAmount ?? ""), dueAt: "", note: "" })));
+    };
+    const uploadReview = async () => actions.uploadRequestFile(initial, upload(id, await fields({ context: "team", kind: "review", file: new File([pdf], "review-private.pdf") })));
+    const publishReview = async () => actions.publishRequestReview(initial, form(await fields({ note: "Vérifiez cette version de travail." })));
+
+    staffEnabled = false;
+    const before = accesses;
+    for (const action of [actions.sendRequestProposal, actions.publishRequestReview, actions.removeDraftReview]) {
+      await assert.rejects(action(initial, form({ requestId: String(id), version: "0", quoteAmountXOF: "12000", fileId: "1" })), /Redirect:\/admin\/connexion/);
+    }
+    assert.equal(accesses, before); staffEnabled = true;
+    assert.equal((await update("in_progress")).ok, false);
+    assert.equal((await publishReview()).ok, false);
+    assert.equal((await proposal({ quoteAmountXOF: "" })).ok, false);
+    assert.equal((await proposal()).ok, true, "explicit proposal can be sent directly from received");
+    assert.equal((await current()).status, "quoted");
+    assert.equal((await update("in_progress")).ok, false, "staff cannot accept the price for the customer");
+    assert.equal((await decision("reject_quote")).ok, false, "rejection requires a useful explanation");
+    assert.equal((await decision("reject_quote", "Je souhaite ajuster le périmètre et le prix.")).ok, true);
+    assert.equal((await current()).status, "reviewing");
+    assert.equal((await decision("accept_quote")).ok, false, "old price cannot be accepted after rejection");
+    assert.equal((await proposal({ quoteAmountXOF: "10000" })).ok, true);
+    assert.equal((await decision("accept_quote")).ok, true);
+    assert.equal((await current()).status, "in_progress");
+    assert.equal((await proposal({ quoteAmountXOF: "13000" })).ok, false, "accepted price is immutable");
+    assert.equal((await update("finalized")).ok, false);
+    assert.equal((await update("delivered")).ok, false);
+    assert.equal((await decision("approve_review")).ok, false);
+    assert.equal((await publishReview()).ok, false, "review file is required");
+    assert.equal((await actions.uploadRequestFile(initial, upload(id, { kind: "review" }))).ok, false, "customer cannot impersonate review uploader");
+    assert.equal((await uploadReview()).ok, true);
+    const review = (await current()).files.find(file => file.kind === "review");
+    assert.equal(await files.getWorkspaceFile(review.id), null);
+    assert.equal((await queries.getCustomerFiles()).some(file => file.id === review.id), false);
+    assert.ok(await files.getWorkspaceFile(review.id, "team"));
+    await assert.rejects(db.insert(workspaceSchema.requestFiles).values({ requestId: id, filename: "forged.pdf", mimeType: "application/pdf", size: pdf.length, kind: "review", content: pdf, uploadedByType: "customer", uploadedById: 1, uploadedByName: "Customer" }), error => error.cause?.constraint === "request_files_staff_prepared_check");
+
+    // An outbox failure must roll back the business event, status and visibility.
+    await pg.exec("ALTER TABLE workspace_notifications ADD CONSTRAINT test_reject_review_notification CHECK(kind <> 'awaiting_validation') NOT VALID");
+    const beforeReview = await current();
+    try {
+      assert.equal((await publishReview()).ok, false);
+      assert.equal((await current()).status, "in_progress");
+      assert.equal((await current()).version, beforeReview.version);
+      assert.equal(await files.getWorkspaceFile(review.id), null);
+      assert.equal((await current()).events.some(event => event.type === "awaiting_validation"), false);
+    } finally { await pg.exec("ALTER TABLE workspace_notifications DROP CONSTRAINT test_reject_review_notification"); }
+    const submitted = await fields({});
+    const results = await Promise.all([actions.publishRequestReview(initial, form(submitted)), actions.publishRequestReview(initial, form(submitted))]);
+    assert.equal(results.filter(result => result.ok).length, 1);
+    assert.equal((await current()).status, "awaiting_validation");
+    assert.ok(await files.getWorkspaceFile(review.id));
+    assert.ok((await queries.getCustomerFiles()).some(file => file.id === review.id));
+    assert.equal((await queries.getCustomerWorkspace()).stats.awaitingResponse >= 1, true);
+    assert.equal((await update("finalized")).ok, false, "only the customer validates the work");
+    assert.equal((await decision("complete")).ok, false, "intermediate review cannot close the request");
+    activeCustomer = customers[1];
+    assert.equal((await decision("approve_review")).ok, false);
+    assert.equal(await files.getWorkspaceFile(review.id), null);
+    activeCustomer = customers[0];
+    assert.equal((await decision("request_revision", "Merci de préciser ma formation.")).ok, true);
+    assert.equal((await current()).status, "revision_requested");
+    assert.equal((await actions.removeDraftReview(initial, form(await fields({ fileId: String(review.id) })))).ok, false, "published review is immutable");
+    assert.ok(await files.getWorkspaceFile(review.id), "published versions remain accessible during revisions");
+    assert.equal((await publishReview()).ok, false, "revision must first resume work");
+    assert.equal((await update("in_progress")).ok, true);
+    assert.equal((await publishReview()).ok, false, "old working file cannot satisfy a new revision");
+    assert.equal((await uploadReview()).ok, true);
+    const draft = (await current()).files.filter(file => file.kind === "review").at(-1);
+    const oldVersion = (await current()).version;
+    assert.equal((await actions.removeDraftReview(initial, form(await fields({ fileId: String(draft.id), version: String(oldVersion + 1) })))).ok, false);
+    assert.equal((await actions.removeDraftReview(initial, form(await fields({ fileId: String(draft.id) })))).ok, true);
+    assert.equal((await current()).version, oldVersion + 1);
+    assert.equal(await files.getWorkspaceFile(draft.id, "team"), null);
+    assert.equal((await uploadReview()).ok, true);
+    assert.equal((await publishReview()).ok, true);
+    assert.equal((await decision("approve_review")).ok, true);
+    assert.equal((await current()).status, "finalized");
+    assert.equal((await actions.publishRequestDelivery(initial, form(await fields({})))).ok, false, "review file is not a final deliverable");
+    assert.equal((await uploadDelivery(id)).ok, true);
+    const finalFile = (await current()).files.find(file => file.kind === "delivery");
+    assert.equal(await files.getWorkspaceFile(finalFile.id), null, "review publication never exposes final drafts");
+    assert.equal((await actions.publishRequestDelivery(initial, form(await fields({})))).ok, true);
+    assert.equal((await current()).status, "delivered");
+    assert.ok(await files.getWorkspaceFile(finalFile.id));
+    assert.equal((await decision("complete")).ok, true);
+    const completed = await current();
+    assert.equal(completed.status, "completed"); assert.equal(completed.quotedAmount, 10000);
+    const jobs = (await pg.query("SELECT kind,audience,payload FROM workspace_notifications WHERE request_id=$1 AND kind IN ('quoted','quote_rejected','awaiting_validation','finalized','delivered') ORDER BY id", [id])).rows;
+    assert.deepEqual(jobs.map(row => [row.kind, row.audience]), [["quoted", "customer"], ["quote_rejected", "team"], ["quoted", "customer"], ["awaiting_validation", "customer"], ["awaiting_validation", "customer"], ["finalized", "team"], ["delivered", "customer"]]);
+    assert.ok(jobs.every(row => row.payload === null));
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261022_workflow.sql"), "utf8"));
+    assert.equal((await current()).status, "completed", "reapplying migration preserves historical terminal states");
+    assert.ok(await files.getWorkspaceFile(finalFile.id));
   });
 
   await t.test("customer quotas apply atomically across requests, reset when expired and exempt staff", async () => {

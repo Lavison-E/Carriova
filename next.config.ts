@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   experimental: { serverActions: { bodySizeLimit: "4mb" } },
+  outputFileTracingIncludes: { "/api/espace/cv/*/pdf": ["./public/fonts/cv/*.woff"] },
   images: {
     formats: ["image/avif", "image/webp"],
   },

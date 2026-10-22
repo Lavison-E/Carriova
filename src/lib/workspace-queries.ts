@@ -11,15 +11,15 @@ import { workspaceStatusOptions, type CustomerWorkspace, type TeamRequestFilters
 const summaryColumns = {
   id: serviceRequests.id, title: serviceRequests.title, service: serviceRequests.service,
   status: serviceRequests.status, quotedAmount: serviceRequests.quotedAmount, dueAt: serviceRequests.dueAt,
-  version: serviceRequests.version, customerName: customerUsers.name, customerEmail: customerUsers.email,
+  version: serviceRequests.version, customerName: customerUsers.name, customerEmail: customerUsers.email, customerWhatsApp: customerUsers.whatsapp,
   createdAt: serviceRequests.createdAt, updatedAt: serviceRequests.updatedAt,
 };
-function summary(row: typeof serviceRequests.$inferSelect & { customerName: string; customerEmail: string }): WorkspaceRequestSummary;
+function summary(row: typeof serviceRequests.$inferSelect & { customerName: string; customerEmail: string; customerWhatsApp: string | null }): WorkspaceRequestSummary;
 function summary(row: Omit<WorkspaceRequestSummary, "createdAt" | "updatedAt" | "dueAt"> & { createdAt: Date; updatedAt: Date; dueAt: Date | null }): WorkspaceRequestSummary;
 function summary(row: Omit<WorkspaceRequestSummary, "createdAt" | "updatedAt" | "dueAt"> & { createdAt: Date; updatedAt: Date; dueAt: Date | null }): WorkspaceRequestSummary {
   return { id: row.id, title: row.title, service: row.service, status: row.status, quotedAmount: row.quotedAmount,
     dueAt: row.dueAt?.toISOString() ?? null, version: row.version, customerName: row.customerName,
-    customerEmail: row.customerEmail, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+    customerEmail: row.customerEmail, customerWhatsApp: row.customerWhatsApp, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
 export async function getCustomerWorkspace(): Promise<CustomerWorkspace> {
@@ -31,7 +31,7 @@ export async function getCustomerWorkspace(): Promise<CustomerWorkspace> {
   return { requests, stats: {
     total: requests.length,
     active: requests.filter((request) => !["completed", "cancelled"].includes(request.status)).length,
-    awaitingResponse: requests.filter((request) => ["quoted", "delivered"].includes(request.status)).length,
+    awaitingResponse: requests.filter((request) => ["quoted", "awaiting_validation", "delivered"].includes(request.status)).length,
     completed: requests.filter((request) => request.status === "completed").length,
   } };
 }
@@ -75,7 +75,7 @@ async function getRequest(id: number, customerId?: number): Promise<WorkspaceReq
   // Customer delivery files become visible only after an explicit delivery event.
   const publishedFile = customerId === undefined ? undefined : or(eq(requestFiles.kind, "brief"), sql`exists (
     select 1 from ${requestEvents} where ${requestEvents.requestId} = ${requestFiles.requestId}
-    and ${requestEvents.type} = 'delivered' and ${requestEvents.createdAt} >= ${requestFiles.createdAt}
+    and ${requestEvents.type} = case when ${requestFiles.kind} = 'review' then 'awaiting_validation' else 'delivered' end and ${requestEvents.createdAt} >= ${requestFiles.createdAt}
   )`);
   const [messages, events, files] = await Promise.all([
     db.select({ id: requestMessages.id, authorType: requestMessages.authorType, authorName: requestMessages.authorName, body: requestMessages.body, createdAt: requestMessages.createdAt })
@@ -108,7 +108,7 @@ export async function getCustomerFiles(): Promise<WorkspaceCustomerFile[]> {
     .from(requestFiles).innerJoin(serviceRequests, eq(serviceRequests.id, requestFiles.requestId))
     .where(and(eq(serviceRequests.customerId, customer.id), or(eq(requestFiles.kind, "brief"), sql`exists (
       select 1 from ${requestEvents} where ${requestEvents.requestId} = ${requestFiles.requestId}
-      and ${requestEvents.type} = 'delivered' and ${requestEvents.createdAt} >= ${requestFiles.createdAt}
+      and ${requestEvents.type} = case when ${requestFiles.kind} = 'review' then 'awaiting_validation' else 'delivered' end and ${requestEvents.createdAt} >= ${requestFiles.createdAt}
     )`))).orderBy(desc(requestFiles.createdAt), desc(requestFiles.id));
   return files.map((file) => ({ ...file, createdAt: file.createdAt.toISOString() }));
 }

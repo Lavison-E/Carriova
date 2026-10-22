@@ -57,6 +57,7 @@ function requireOpen(status: WorkspaceStatus) {
 }
 function invalidate(id?: number) {
   revalidatePath("/espace");
+  revalidatePath("/espace/documents");
   revalidatePath("/admin/commandes");
   if (id) {
     scheduleWorkspaceNotifications({ requestId: id });
@@ -121,30 +122,29 @@ export async function uploadRequestFile(_prev: ActionState, fd: FormData): Promi
   return asActor(contextFor(fd), async (actor) => {
     const id = requestId(fd);
     const kind = text(fd, "kind");
-    if (kind !== "brief" && kind !== "delivery") return failure("Choisissez un type de document valide.");
-    if (kind === "delivery" && actor.type !== "staff") return failure("Seule l’équipe peut déposer une livraison.");
-    const expectedVersion = kind === "delivery" ? versionOf(fd) : null;
+    if (kind !== "brief" && kind !== "review" && kind !== "delivery") return failure("Choisissez un type de document valide.");
+    if (kind !== "brief" && actor.type !== "staff") return failure("Seule l’équipe peut préparer les documents à valider ou à livrer.");
+    const expectedVersion = kind !== "brief" ? versionOf(fd) : null;
     const value = fd.get("file");
     if (!value || typeof value === "string") return failure("Choisissez un fichier.", { file: "Un fichier est requis." });
     await getDb().transaction(async (tx) => {
       const current = await lockedRequest(tx, id, actor);
       if (expectedVersion !== null) checkVersion(current.version, expectedVersion);
       requireOpen(current.status);
-      if (kind === "delivery" && !["in_progress", "revision_requested"].includes(current.status)) throw new WorkspaceError("La demande doit être en cours pour préparer sa livraison.");
+      if (kind === "review" && current.status !== "in_progress") throw new WorkspaceError("La réalisation doit être en cours pour préparer une validation client.");
+      if (kind === "delivery" && !["in_progress", "revision_requested", "finalized"].includes(current.status)) throw new WorkspaceError("La demande doit être en cours pour préparer sa livraison.");
       const [existing] = await tx.select({ total: count() }).from(requestFiles).where(and(eq(requestFiles.requestId, id), eq(requestFiles.kind, kind)));
-      if (existing.total >= WORKSPACE_MAX_FILES) throw new WorkspaceError(kind === "delivery"
-        ? `Cette demande contient déjà le maximum de ${WORKSPACE_MAX_FILES} fichiers de livraison.`
-        : `Cette demande contient déjà le maximum de ${WORKSPACE_MAX_FILES} documents initiaux.`);
+      if (existing.total >= WORKSPACE_MAX_FILES) throw new WorkspaceError(`Cette demande contient déjà ${WORKSPACE_MAX_FILES} fichiers de ce type.`);
       await customerQuota(tx, actor, "uploads", 24, 86400, "Vous avez atteint la limite de 24 fichiers déposés sur 24 heures. Patientez avant d’ajouter un document.");
       // Ownership and count are checked under the same lock before reading or persisting bytes.
       const file = await validateWorkspaceFile(value);
       await tx.insert(requestFiles).values({ ...file, requestId: id, kind, uploadedByType: actor.type, uploadedById: actor.id, uploadedByName: actor.name, createdAt: new Date() });
       if (kind === "brief") await tx.insert(requestEvents).values({ requestId: id, type: "file_added", actorName: actor.name, body: `Document ajouté : ${file.filename}`, createdAt: new Date() });
       // A publisher must review the current set of drafts, including uploads from another staff member.
-      await tx.update(serviceRequests).set({ updatedAt: new Date(), ...(kind === "delivery" ? { version: current.version + 1 } : {}) }).where(eq(serviceRequests.id, id));
+      await tx.update(serviceRequests).set({ updatedAt: new Date(), ...(kind !== "brief" ? { version: current.version + 1 } : {}) }).where(eq(serviceRequests.id, id));
     });
     invalidate(id);
-    return { ok: true, message: kind === "delivery" ? "Fichier de livraison préparé. Publiez la livraison pour le rendre accessible au client." : "Votre document a été ajouté." };
+    return { ok: true, message: kind === "review" ? "Version de travail préparée. Envoyez-la pour validation afin de la rendre accessible au client." : kind === "delivery" ? "Fichier de livraison préparé. Publiez la livraison pour le rendre accessible au client." : "Votre document a été ajouté." };
   });
 }
 
@@ -164,45 +164,78 @@ async function saveStaffRequestUpdate(tx: Transaction, actor: Actor, current: ty
   if (status !== current.status && !staffRequestTransitions[current.status].includes(status)) throw new WorkspaceError("Cette transition n’est pas autorisée. L’acceptation du devis et la validation de livraison appartiennent au client.");
   if (status === "quoted" && quotedAmount === null) throw new WorkspaceError("Indiquez le prix proposé avant d’envoyer la proposition, y compris 0 pour une prestation offerte.");
   if (!["received", "reviewing", "quoted"].includes(current.status) && quotedAmount !== current.quotedAmount) throw new WorkspaceError("Le prix accepté par le client ne peut plus être modifié.");
-  if (status === "delivered" && current.status !== "delivered") {
+  if ((status === "delivered" || status === "awaiting_validation") && current.status !== status) {
+    const kind = status === "delivered" ? "delivery" : "review";
     const [revision] = await tx.select({ createdAt: requestEvents.createdAt }).from(requestEvents)
       .where(and(eq(requestEvents.requestId, id), eq(requestEvents.type, "revision_requested"))).orderBy(desc(requestEvents.id)).limit(1);
     const [delivery] = await tx.select({ id: requestFiles.id }).from(requestFiles)
-      .where(and(eq(requestFiles.requestId, id), eq(requestFiles.kind, "delivery"), revision ? gt(requestFiles.createdAt, revision.createdAt) : undefined)).limit(1);
-    if (!delivery) throw new WorkspaceError(revision ? "Ajoutez un nouveau fichier pour livrer cette révision." : "Ajoutez un fichier de livraison avant de marquer la demande comme livrée.");
+      .where(and(eq(requestFiles.requestId, id), eq(requestFiles.kind, kind), revision ? gt(requestFiles.createdAt, revision.createdAt) : undefined)).limit(1);
+    if (!delivery) throw new WorkspaceError(revision ? "Ajoutez un nouveau fichier de ce type après la demande de révision." : kind === "review" ? "Ajoutez une version de travail avant de demander la validation du client." : "Ajoutez un fichier final avant d’envoyer le projet.");
   }
   const now = new Date();
   const [updated] = await tx.update(serviceRequests).set({ status, quotedAmount, dueAt, version: version + 1, updatedAt: now })
     .where(and(eq(serviceRequests.id, id), eq(serviceRequests.version, version))).returning({ id: serviceRequests.id });
   if (!updated) throw new WorkspaceError("Cette demande a changé. Rechargez la page.");
   const description = status === "quoted" ? `Proposition : ${quotedAmount === 0 ? "prestation offerte" : `${quotedAmount} FCFA (XOF)`}. Votre acceptation est attendue ; aucun paiement n’est enregistré ici.` : `Suivi mis à jour : ${workspaceStatusLabel(status)}.`;
-  await tx.insert(requestEvents).values({ requestId: id, type: status !== current.status ? status : "updated", actorName: actor.name, body: description, status, createdAt: now });
+  await tx.insert(requestEvents).values({ requestId: id, type: status === "quoted" || status !== current.status ? status : "updated", actorName: actor.name, body: description, status, createdAt: now });
   if (note) await message(tx, id, actor, note);
 }
 
+function staffUpdateInput(fd: FormData, forcedStatus?: WorkspaceStatus) {
+  const status = forcedStatus ?? text(fd, "status") as WorkspaceStatus;
+  const note = text(fd, "note");
+  const rawAmount = text(fd, "quoteAmountXOF");
+  const quotedAmount = rawAmount === "" ? null : Number(rawAmount);
+  const rawDueAt = text(fd, "dueAt");
+  const dueAt = rawDueAt ? new Date(rawDueAt) : null;
+  const fieldErrors: Record<string, string> = {};
+  if (!workspaceStatusOptions.some(option => option.value === status)) fieldErrors.status = "Choisissez un statut valide.";
+  if (quotedAmount !== null && (!/^\d+$/.test(rawAmount) || !Number.isSafeInteger(quotedAmount) || quotedAmount > 2147483647)) fieldErrors.quoteAmountXOF = "Indiquez un montant entier positif ou nul en FCFA.";
+  if (status === "quoted" && quotedAmount === null) fieldErrors.quoteAmountXOF = "Indiquez le prix proposé, y compris 0 pour une prestation offerte.";
+  if (dueAt && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(rawDueAt) || !Number.isFinite(dueAt.getTime()) || dueAt.toISOString() !== (rawDueAt.includes(".") ? rawDueAt : rawDueAt.replace("Z", ".000Z")))) fieldErrors.dueAt = "Indiquez une échéance UTC valide.";
+  if (note.length > 5000) fieldErrors.note = "Limitez la note à 5 000 caractères.";
+  if (status === "cancelled" && note.length < 3) fieldErrors.note = "Expliquez l’annulation au client.";
+  return { status, quotedAmount, dueAt, note, fieldErrors };
+}
 export async function updateServiceRequest(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  return asActor("team", async (actor) => {
-    const id = requestId(fd);
-    const version = versionOf(fd);
-    const status = text(fd, "status") as WorkspaceStatus;
-    const note = text(fd, "note");
-    const rawAmount = text(fd, "quoteAmountXOF");
-    const quotedAmount = rawAmount === "" ? null : Number(rawAmount);
-    const rawDueAt = text(fd, "dueAt");
-    const dueAt = rawDueAt ? new Date(rawDueAt) : null;
-    const fieldErrors: Record<string, string> = {};
-    if (!workspaceStatusOptions.some((option) => option.value === status)) fieldErrors.status = "Choisissez un statut valide.";
-    if (quotedAmount !== null && (!/^\d+$/.test(rawAmount) || !Number.isSafeInteger(quotedAmount) || quotedAmount > 2147483647)) fieldErrors.quoteAmountXOF = "Indiquez un montant entier positif ou nul en FCFA.";
-    if (dueAt && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(rawDueAt) || !Number.isFinite(dueAt.getTime()) || dueAt.toISOString() !== (rawDueAt.includes(".") ? rawDueAt : rawDueAt.replace("Z", ".000Z")))) fieldErrors.dueAt = "Indiquez une échéance UTC valide.";
-    if (note.length > 5000) fieldErrors.note = "Limitez la note à 5 000 caractères.";
-    if (status === "cancelled" && note.length < 3) fieldErrors.note = "Expliquez l’annulation au client.";
+  return asActor("team", async actor => {
+    const id = requestId(fd); const version = versionOf(fd);
+    const { fieldErrors, ...changes } = staffUpdateInput(fd);
     if (Object.keys(fieldErrors).length) return failure("Vérifiez les champs indiqués.", fieldErrors);
-    await getDb().transaction(async (tx) => {
+    await getDb().transaction(async tx => {
       const current = await lockedRequest(tx, id, actor);
-      await saveStaffRequestUpdate(tx, actor, current, { version, status, quotedAmount, dueAt, note });
+      await saveStaffRequestUpdate(tx, actor, current, { version, ...changes });
     });
     invalidate(id);
     return { ok: true, message: "La demande a été mise à jour. Les informations et la note sont visibles par le client." };
+  });
+}
+export async function sendRequestProposal(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return asActor("team", async actor => {
+    const id = requestId(fd); const version = versionOf(fd);
+    const { fieldErrors, ...changes } = staffUpdateInput(fd, "quoted");
+    if (Object.keys(fieldErrors).length) return failure("Vérifiez votre proposition.", fieldErrors);
+    await getDb().transaction(async tx => {
+      const current = await lockedRequest(tx, id, actor);
+      if (!["received", "reviewing", "quoted"].includes(current.status)) throw new WorkspaceError("Le prix accepté ne peut plus être modifié. La réalisation doit suivre les étapes prévues.");
+      await saveStaffRequestUpdate(tx, actor, current, { version, ...changes });
+    });
+    invalidate(id);
+    return { ok: true, message: "La proposition a été envoyée. Le client doit valider son prix avant le début de la réalisation." };
+  });
+}
+export async function publishRequestReview(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return asActor("team", async actor => {
+    const id = requestId(fd); const version = versionOf(fd); const note = text(fd, "note");
+    if (note.length > 5000) return failure("Limitez la note à 5 000 caractères.", { note: "La note est trop longue." });
+    await getDb().transaction(async tx => {
+      const current = await lockedRequest(tx, id, actor);
+      checkVersion(current.version, version);
+      if (current.status !== "in_progress") throw new WorkspaceError("La réalisation doit être en cours pour demander la validation du client.");
+      await saveStaffRequestUpdate(tx, actor, current, { version, status: "awaiting_validation", quotedAmount: current.quotedAmount, dueAt: current.dueAt, note });
+    });
+    invalidate(id);
+    return { ok: true, message: "La version de travail est disponible. Le client peut la valider ou demander des ajustements avant la livraison finale." };
   });
 }
 
@@ -214,7 +247,8 @@ export async function publishRequestDelivery(_prev: ActionState, fd: FormData): 
     if (note.length > 5000) return failure("Vérifiez la note de livraison.", { note: "Limitez la note à 5 000 caractères." });
     await getDb().transaction(async (tx) => {
       const current = await lockedRequest(tx, id, actor);
-      if (current.status !== "in_progress" && current.status !== "revision_requested") throw new WorkspaceError("La demande doit être en cours ou en révision pour publier une livraison.");
+      checkVersion(current.version, version);
+      if (current.status !== "finalized") throw new WorkspaceError("Le client doit d’abord valider la réalisation. Seul un projet finalisé peut être envoyé.");
       await saveStaffRequestUpdate(tx, actor, current, {
         version, status: "delivered", quotedAmount: current.quotedAmount, dueAt: current.dueAt, note,
       });
@@ -224,7 +258,7 @@ export async function publishRequestDelivery(_prev: ActionState, fd: FormData): 
   });
 }
 
-export async function removeDraftDelivery(_prev: ActionState, fd: FormData): Promise<ActionState> {
+async function removeDraftFile(fd: FormData, kind: "review" | "delivery"): Promise<ActionState> {
   return asActor("team", async (actor) => {
     const id = requestId(fd);
     const version = versionOf(fd);
@@ -234,12 +268,12 @@ export async function removeDraftDelivery(_prev: ActionState, fd: FormData): Pro
     await getDb().transaction(async (tx) => {
       const current = await lockedRequest(tx, id, actor);
       checkVersion(current.version, version);
-      if (current.status !== "in_progress" && current.status !== "revision_requested") throw new WorkspaceError("Seuls les brouillons d’une demande en cours ou en révision peuvent être retirés.");
-      const scope = and(eq(requestFiles.id, fileId), eq(requestFiles.requestId, id), eq(requestFiles.kind, "delivery"));
+      if (!["in_progress", "revision_requested", "finalized"].includes(current.status)) throw new WorkspaceError("Seuls les brouillons d’une demande en cours, en révision ou finalisée peuvent être retirés.");
+      const scope = and(eq(requestFiles.id, fileId), eq(requestFiles.requestId, id), eq(requestFiles.kind, kind));
       const [file] = await tx.select({ createdAt: requestFiles.createdAt }).from(requestFiles).where(scope).limit(1);
       if (!file) throw new WorkspaceError("Brouillon de livraison introuvable.");
       const [publication] = await tx.select({ id: requestEvents.id }).from(requestEvents)
-        .where(and(eq(requestEvents.requestId, id), eq(requestEvents.type, "delivered"), gte(requestEvents.createdAt, file.createdAt))).limit(1);
+        .where(and(eq(requestEvents.requestId, id), eq(requestEvents.type, kind === "review" ? "awaiting_validation" : "delivered"), gte(requestEvents.createdAt, file.createdAt))).limit(1);
       if (publication) throw new WorkspaceError("Ce document a déjà été publié et ne peut plus être retiré.");
       await tx.delete(requestFiles).where(scope);
       const [updated] = await tx.update(serviceRequests).set({ version: version + 1, updatedAt: new Date() })
@@ -251,14 +285,17 @@ export async function removeDraftDelivery(_prev: ActionState, fd: FormData): Pro
   });
 }
 
+export async function removeDraftDelivery(_prev: ActionState, fd: FormData): Promise<ActionState> { return removeDraftFile(fd, "delivery"); }
+export async function removeDraftReview(_prev: ActionState, fd: FormData): Promise<ActionState> { return removeDraftFile(fd, "review"); }
+
 export async function customerRequestAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   return asActor("customer", async (actor) => {
     const id = requestId(fd);
     const version = versionOf(fd);
     const action = text(fd, "action");
     const note = text(fd, "note");
-    if (!["accept_quote", "request_revision", "complete"].includes(action)) return failure("Action non reconnue.");
-    if (note.length > 5000 || (action === "request_revision" && note.length < 3)) return failure("Précisez votre demande de révision.", { note: "Décrivez les ajustements souhaités en 3 à 5 000 caractères." });
+    if (!["accept_quote", "reject_quote", "approve_review", "request_revision", "complete"].includes(action)) return failure("Action non reconnue.");
+    if (note.length > 5000 || (["reject_quote", "request_revision"].includes(action) && note.length < 3)) return failure("Précisez votre demande de révision.", { note: "Décrivez les ajustements souhaités en 3 à 5 000 caractères." });
     await getDb().transaction(async (tx) => {
       const current = await lockedRequest(tx, id, actor);
       checkVersion(current.version, version);
@@ -267,9 +304,15 @@ export async function customerRequestAction(_prev: ActionState, fd: FormData): P
       if (action === "accept_quote" && current.status === "quoted" && current.quotedAmount !== null) {
         status = "in_progress";
         body = "Le client a accepté la proposition. La prestation peut commencer ; aucun paiement n’est enregistré ici.";
-      } else if (action === "request_revision" && current.status === "delivered") {
+      } else if (action === "reject_quote" && current.status === "quoted") {
+        status = "reviewing";
+        body = "Le client a demandé un ajustement de la proposition. Une nouvelle proposition doit être validée avant la réalisation.";
+      } else if (action === "approve_review" && current.status === "awaiting_validation") {
+        status = "finalized";
+        body = "Le client a validé la réalisation. Le projet est finalisé et l’équipe peut préparer son envoi final.";
+      } else if (action === "request_revision" && ["awaiting_validation", "delivered"].includes(current.status)) {
         status = "revision_requested";
-        body = "Le client a demandé des ajustements à la livraison.";
+        body = "Le client a demandé des ajustements. Une nouvelle version devra être soumise à sa validation avant l’envoi final.";
       } else if (action === "complete" && current.status === "delivered") {
         status = "completed";
         body = "Le client a confirmé la réception et validé la livraison.";
@@ -278,7 +321,7 @@ export async function customerRequestAction(_prev: ActionState, fd: FormData): P
       const [updated] = await tx.update(serviceRequests).set({ status, version: version + 1, updatedAt: now })
         .where(and(eq(serviceRequests.id, id), eq(serviceRequests.customerId, actor.id), eq(serviceRequests.version, version))).returning({ id: serviceRequests.id });
       if (!updated) throw new WorkspaceError("Cette demande a changé. Rechargez la page.");
-      await tx.insert(requestEvents).values({ requestId: id, type: status, actorName: actor.name, body, status, createdAt: now });
+      await tx.insert(requestEvents).values({ requestId: id, type: action === "reject_quote" ? "quote_rejected" : status, actorName: actor.name, body, status, createdAt: now });
       if (note) await message(tx, id, actor, note);
     });
     invalidate(id);

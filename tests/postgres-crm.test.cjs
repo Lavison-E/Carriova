@@ -75,7 +75,7 @@ test("PostgreSQL CRM integration", async (t) => {
     await pg.exec(CORE_LEADS_SQL);
     const inserted = await pg.query("INSERT INTO leads(first_name,last_name,email,type,whatsapp,source) VALUES ('Ancien','Prospect','old@example.test','contact','+2250100000000','website') RETURNING id");
     legacyId = inserted.rows[0].id;
-    assert.deepEqual(await migrateCrm(client), ["20261018_staff.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261018_staff_invites.sql", "20261018_notifications.sql"]);
+    assert.deepEqual(await migrateCrm(client), ["20261018_staff.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261018_staff_invites.sql", "20261018_notifications.sql", "20261018_cv.sql", "20261022_workflow.sql", "20261022_career_profile.sql"]);
     assert.deepEqual(await migrateCrm(client), []);
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_crm.sql"), "utf8"));
     const { rows } = await pg.query("SELECT first_name,email FROM leads WHERE id=$1", [legacyId]);
@@ -220,7 +220,7 @@ test("PostgreSQL CRM integration", async (t) => {
     assert.equal(new Set([...first.leads, ...second.leads].map((lead) => lead.id)).size, 55);
     assert.equal((await getCrmDashboard({ status: "qualified", need: "improve_cv" })).total, 1);
     assert.equal((await getCrmDashboard({ q: "Qualifié" })).total, 1);
-    assert.equal((await getCrmDashboard({ q: "Améliorer" })).total, 9);
+    assert.equal((await getCrmDashboard({ q: "Optimisation" })).total, 9);
     assert.equal((await getCrmDashboard({ q: "' OR true --" })).total, 0);
     assert.equal((await getCrmDashboard({ q: "%" })).total, 0);
     const absent = await getCrmDashboard({ q: "Ancien", due: "none" });

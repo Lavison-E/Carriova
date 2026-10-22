@@ -2,6 +2,7 @@ import { boolean, index, integer, pgTable, serial, timestamp, varchar } from "dr
 import { leads } from "./schema";
 export const customerUsers = pgTable("customer_users", {
  id: serial("id").primaryKey(), email: varchar("email",{length:255}).notNull().unique(),
+ whatsapp: varchar("whatsapp",{length:16}),
  name: varchar("name",{length:120}).notNull(), passwordHash: varchar("password_hash",{length:255}).notNull(),
  enabled: boolean("enabled").notNull().default(true), consentPrivacy: boolean("consent_privacy").notNull(),
  consentMarketing: boolean("consent_marketing").notNull().default(false),

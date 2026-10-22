@@ -27,7 +27,7 @@ const steps = [
     label: "Votre demande",
     title: "Précisons votre demande.",
     description: "Quelques dernières précisions pour mieux vous orienter.",
-    fields: ["budget", "paymentReadiness", "contactWhatsApp", "message", "consentPrivacy", "consentMarketing"],
+    fields: ["budget", "contactWhatsApp", "message", "consentPrivacy", "consentMarketing"],
   },
 ];
 
@@ -279,10 +279,9 @@ export function QualificationForm({ initialNeed = null }: { initialNeed?: Qualif
           <div data-qualification-step hidden={step !== 2} className="space-y-7">
             <h3 className="qualification-no-js hidden text-xl font-semibold text-night">Étape 3 — Votre demande</h3>
             <Choices name="budget" number={11} title="Quel budget pourriez-vous consacrer à cette prestation si elle répond à votre besoin ?" value={values.budget ?? ""} onChange={updateValue} error={errors.budget} />
-            <Choices name="paymentReadiness" number={12} title="Si une solution adaptée vous est proposée, seriez-vous prêt(e) à payer pour en bénéficier ?" value={values.paymentReadiness ?? ""} onChange={updateValue} error={errors.paymentReadiness} columns={1} />
-            <Choices name="contactWhatsApp" number={13} title="Souhaitez-vous être contacté(e) sur WhatsApp pour discuter de votre besoin ?" value={values.contactWhatsApp ?? ""} onChange={updateValue} error={errors.contactWhatsApp} columns={1} />
+            <Choices name="contactWhatsApp" number={12} title="Souhaitez-vous être contacté(e) sur WhatsApp pour discuter de votre besoin ?" value={values.contactWhatsApp ?? ""} onChange={updateValue} error={errors.contactWhatsApp} columns={1} />
             <div>
-              <label htmlFor="qualification-message"><QuestionLabel number={14} title="Une précision sur votre besoin ?" /></label>
+              <label htmlFor="qualification-message"><QuestionLabel number={13} title="Une précision sur votre besoin ?" /></label>
               <textarea id="qualification-message" name="message" rows={4} maxLength={4000} value={values.message ?? ""} onChange={(event) => updateValue("message", event.target.value)} aria-invalid={errors.message ? true : undefined} aria-describedby={errors.message ? "qualification-message-error" : undefined} className="mt-3 w-full resize-y rounded-lg border border-line bg-white px-4 py-3 text-sm leading-7 text-night focus:border-night" />
               {errors.message ? <p id="qualification-message-error" className="mt-2 text-xs leading-5 text-orange">{errors.message}</p> : null}
             </div>

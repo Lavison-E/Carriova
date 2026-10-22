@@ -73,13 +73,27 @@ export function CustomerDecisionForm({ request }: { request: WorkspaceRequestSum
   const { state, action, pending, revision } = submission;
   const [adjustments, setAdjustments] = useState(false);
   const quote = request.status === "quoted" && request.quotedAmount !== null;
+  const review = request.status === "awaiting_validation";
   const delivered = request.status === "delivered";
-  if (!quote && !delivered) return null;
-  return <section className="rounded-xl border border-[#e2c7ae] bg-[#fff8f0] p-5 sm:p-7" aria-labelledby="decision-title"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">À vous de jouer</p><h2 id="decision-title" className="mt-3 text-xl font-semibold tracking-tight text-night">{quote ? "Votre proposition est prête." : "Votre livraison vous attend."}</h2><p className="mt-3 max-w-2xl text-xs leading-7 text-muted">{quote ? "Consultez les échanges avec l’équipe, puis confirmez si la proposition vous convient. Son acceptation permettra de démarrer votre accompagnement." : "Téléchargez les fichiers de votre produit ci-dessous. Vous pouvez valider la livraison ou préciser les ajustements souhaités à l’équipe."}</p>{quote ? <p className="mt-5 text-3xl font-semibold tracking-tight text-night">{formatAmount(request.quotedAmount)}<span className="ml-2 text-[10px] font-normal text-muted">{request.quotedAmount !== 0 ? "XOF" : ""}</span></p> : <a href="#livrables" className="mt-4 inline-flex min-h-10 items-center gap-3 text-xs font-semibold text-night underline underline-offset-4">Télécharger mon produit <CareerIcon name="arrow" className="h-3.5 w-3.5" /></a>}
-    <div className="mt-5"><Feedback submission={submission} /><form key={revision} action={action} onReset={(event) => event.preventDefault()} aria-busy={pending}>
-      <input type="hidden" name="requestId" value={request.id} /><input type="hidden" name="version" value={request.version} /><input type="hidden" name="action" value={quote ? "accept_quote" : adjustments ? "request_revision" : "complete"} />
-      {delivered && adjustments ? <fieldset disabled={pending} className="mb-5 min-w-0"><Field name="note" label="Quels ajustements souhaitez-vous ?" error={state.fieldErrors?.note}>{(props) => <textarea {...props} required minLength={3} maxLength={5000} rows={4} className={`${inputStyle} resize-y`} />}</Field></fieldset> : null}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap"><button type="submit" disabled={pending} className={buttonStyle}>{pending ? "Enregistrement…" : quote ? "Accepter la proposition" : adjustments ? "Envoyer ma demande de retouche" : "Valider la livraison"}<CareerIcon name={quote || adjustments ? "arrow" : "check"} className="h-4 w-4" /></button>{delivered ? <button type="button" disabled={pending} onClick={() => setAdjustments((value) => !value)} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-night/20 px-5 text-xs font-semibold text-night disabled:opacity-60">{adjustments ? "Revenir à la validation" : "Demander une retouche"}</button> : null}</div>
+  if (!quote && !review && !delivered) return null;
+  const decision = adjustments ? quote ? "reject_quote" : "request_revision" : quote ? "accept_quote" : review ? "approve_review" : "complete";
+  const heading = quote ? "Validez le prix de votre proposition." : review ? "Votre réalisation attend votre retour." : "Votre projet a été envoyé.";
+  const explanation = quote
+    ? "Consultez la proposition et les précisions de l’équipe. La réalisation commencera après votre acceptation du prix. Vous pouvez aussi demander un ajustement."
+    : review ? "Consultez la version de travail ci-dessous. Votre validation finalise la réalisation ; l’équipe pourra ensuite envoyer le projet final. Si nécessaire, demandez des ajustements."
+    : "Téléchargez les fichiers finaux ci-dessous, puis confirmez que le projet reçu vous convient. Cette validation clôture la demande. Vous pouvez aussi demander une correction.";
+  return <section className="rounded-xl border border-[#e2c7ae] bg-[#fff8f0] p-5 sm:p-7" aria-labelledby="decision-title">
+    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">Votre validation est attendue</p>
+    <h2 id="decision-title" className="mt-3 text-xl font-semibold tracking-tight text-night">{heading}</h2>
+    <p className="mt-3 max-w-2xl text-xs leading-7 text-muted">{explanation}</p>
+    {quote ? <p className="mt-5 text-3xl font-semibold tracking-tight text-night">{formatAmount(request.quotedAmount)}<span className="ml-2 text-[10px] font-normal text-muted">{request.quotedAmount !== 0 ? "XOF" : ""}</span></p> : <a href={review ? "#validation" : "#livrables"} className="mt-4 inline-flex min-h-10 items-center gap-3 text-xs font-semibold text-night underline underline-offset-4">{review ? "Consulter la version de travail" : "Télécharger le projet final"}<CareerIcon name="arrow" className="h-3.5 w-3.5" /></a>}
+    <div className="mt-5"><Feedback submission={submission} /><form key={revision} action={action} onReset={event => event.preventDefault()} aria-busy={pending}>
+      <input type="hidden" name="requestId" value={request.id} /><input type="hidden" name="version" value={request.version} /><input type="hidden" name="action" value={decision} />
+      {adjustments ? <fieldset disabled={pending} className="mb-5 min-w-0"><Field name="note" label={quote ? "Quel ajustement souhaitez-vous pour cette proposition ?" : "Quels ajustements souhaitez-vous ?"} error={state.fieldErrors?.note}>{props => <textarea {...props} required minLength={3} maxLength={5000} rows={4} className={`${inputStyle} resize-y`} />}</Field></fieldset> : null}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <button type="submit" disabled={pending} className={buttonStyle}>{pending ? "Enregistrement…" : adjustments ? "Envoyer ma demande d’ajustement" : quote ? "Accepter le prix et démarrer" : review ? "Valider la réalisation" : "Valider le projet reçu"}<CareerIcon name={adjustments || quote ? "arrow" : "check"} className="h-4 w-4" /></button>
+        <button type="button" disabled={pending} onClick={() => setAdjustments(value => !value)} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-night/20 px-5 text-xs font-semibold text-night disabled:opacity-60">{adjustments ? "Revenir à la validation" : quote ? "Demander un autre prix" : "Demander des ajustements"}</button>
+      </div>
       {quote ? <p className="mt-4 text-[10px] leading-6 text-muted">Cette confirmation accepte le devis. Aucun paiement n’est effectué sur cette page.</p> : null}
     </form></div>
   </section>;

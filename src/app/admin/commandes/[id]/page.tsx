@@ -5,7 +5,7 @@ import { DraftDeliveryRemoveButton, OrderConversation, OrderManager } from "@/co
 import { FileList, RequestProgress, RequestStatusBadge, formatAmount, formatWorkspaceDate } from "@/components/workspace/WorkspaceUi";
 import { getStaffSession, UnauthorizedError, type StaffIdentity } from "@/lib/staff-auth";
 import { getTeamRequest } from "@/lib/workspace-queries";
-import { workspaceServiceLabel, type WorkspaceRequestDetail } from "@/lib/workspace";
+import { isWorkspaceFilePublished, workspaceServiceLabel, type WorkspaceRequestDetail } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dossier commande | Équipe Carriova", robots: { index: false, follow: false } };
@@ -28,17 +28,31 @@ export default async function TeamOrderPage({ params }: { params: Promise<{ id: 
   if (!request) notFound();
   const briefs = request.files.filter((file) => file.kind === "brief");
   const deliveries = request.files.filter((file) => file.kind === "delivery");
-  const published = deliveries.filter((file) => request.events.some((event) => event.type === "delivered" && event.createdAt >= file.createdAt));
+  const published = deliveries.filter((file) => isWorkspaceFilePublished(file, request.events));
+  const reviews = request.files.filter((file) => file.kind === "review");
+  const publishedReviews = reviews.filter((file) => isWorkspaceFilePublished(file, request.events));
+  const draftReviews = reviews.filter((file) => !isWorkspaceFilePublished(file, request.events));
   const publishedIds = new Set(published.map((file) => file.id));
   const prepared = deliveries.filter((file) => !publishedIds.has(file.id));
   const latestRevision = request.events.filter((event) => event.type === "revision_requested").reduce<string | null>((latest, event) => !latest || event.createdAt > latest ? event.createdAt : latest, null);
   const publishableCount = prepared.filter((file) => !latestRevision || file.createdAt > latestRevision).length;
-  const canDeliver = request.status === "in_progress" || request.status === "revision_requested";
+  const canDeliver = ["in_progress", "revision_requested", "finalized"].includes(request.status);
+  const publishableReviewCount = draftReviews.filter((file) => !latestRevision || file.createdAt > latestRevision).length;
 
   return <CrmShell user={user} section="orders" action={<RefreshButton />} title={request.title} description={`Commande #${request.id} · ${workspaceServiceLabel(request.service)}`} back>
     <div className="mb-7 flex flex-wrap items-center justify-between gap-4"><RequestStatusBadge status={request.status} /><p className="text-xs leading-6 text-muted">Dernière activité : {formatWorkspaceDate(request.updatedAt, true)}</p></div>
     <RequestProgress status={request.status} />
-    <OrderManager key={request.id} request={{ id: request.id, version: request.version, status: request.status, quotedAmount: request.quotedAmount, dueAt: request.dueAt, briefCount: briefs.length, deliveryCount: deliveries.length, unpublishedCount: prepared.length, publishableCount }}>
+    <OrderManager key={request.id} request={{ id: request.id, version: request.version, status: request.status, quotedAmount: request.quotedAmount, dueAt: request.dueAt, reviewCount: reviews.length, unpublishedReviewCount: draftReviews.length, publishableReviewCount, briefCount: briefs.length, deliveryCount: deliveries.length, unpublishedCount: prepared.length, publishableCount }}>
+        <section id="order-reviews" className="scroll-mt-6 rounded-xl border border-line bg-white p-5 sm:p-7" aria-labelledby="order-reviews-title">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">03 / Réalisation</p>
+          <h2 id="order-reviews-title" className="mt-3 text-xl font-semibold tracking-tight">Versions de travail et validation</h2>
+          <p className="mt-3 text-xs leading-6 text-muted">Le client valide cette étape avant la livraison des produits définitifs.</p>
+          <div className="mt-5 rounded-lg border border-orange/20 bg-[#fffaf5] p-4">
+            <h3 className="text-sm font-semibold">Brouillons privés · {draftReviews.length}</h3>
+            <div className="mt-4">{draftReviews.length ? <ul className="space-y-4">{draftReviews.map(file => <li key={file.id}><FileList files={[file]} context="team" />{request.status === "in_progress" ? <DraftDeliveryRemoveButton kind="review" requestId={request.id} fileId={file.id} version={request.version} filename={file.filename} /> : null}</li>)}</ul> : <p className="text-xs leading-6 text-muted">Aucune version de travail en préparation.</p>}</div>
+          </div>
+          <div className="mt-6 border-t border-line pt-6"><h3 className="mb-4 text-sm font-semibold">Versions partagées avec le client</h3><FileList files={publishedReviews} context="team" emptyText="Aucune version soumise pour validation." /></div>
+        </section>
         <section id="order-deliverables" className="scroll-mt-6 rounded-xl border border-line bg-white p-5 sm:p-7" aria-labelledby="order-deliverables-title">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">Les produits de cette commande</p>
           <h2 id="order-deliverables-title" className="mt-3 text-xl font-semibold tracking-tight">Préparation et livraisons</h2>
@@ -54,7 +68,7 @@ export default async function TeamOrderPage({ params }: { params: Promise<{ id: 
           </div>
         </section>
         <section className="rounded-xl border border-line bg-white p-5 sm:p-7" aria-labelledby="order-brief-title"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">01 / Comprendre la demande</p><h2 id="order-brief-title" className="mt-3 text-xl font-semibold tracking-tight">Le besoin du client</h2>
-          <dl className="mt-6 grid gap-5 border-y border-line py-5 sm:grid-cols-2"><div className="min-w-0"><dt className="text-[10px] font-semibold uppercase tracking-wide text-muted">Client</dt><dd className="mt-2 break-words text-sm font-semibold text-night">{request.customerName}<span className="mt-1 block break-all text-xs font-normal leading-6 text-muted">{request.customerEmail}</span></dd></div><div><dt className="text-[10px] font-semibold uppercase tracking-wide text-muted">Reçue le</dt><dd className="mt-2 text-sm leading-6">{formatWorkspaceDate(request.createdAt, true)}</dd></div><div><dt className="text-[10px] font-semibold uppercase tracking-wide text-muted">Proposition</dt><dd className="mt-2 text-sm font-semibold">{formatAmount(request.quotedAmount)}</dd></div><div><dt className="text-[10px] font-semibold uppercase tracking-wide text-muted">Échéance</dt><dd className="mt-2 text-sm leading-6">{request.dueAt ? formatWorkspaceDate(request.dueAt, true) : "À convenir"}</dd></div></dl>
+          <dl className="mt-6 grid gap-5 border-y border-line py-5 sm:grid-cols-2"><div className="min-w-0"><dt className="text-[10px] font-semibold uppercase tracking-wide text-muted">Client</dt><dd className="mt-2 break-words text-sm font-semibold text-night">{request.customerName}<span className="mt-1 block break-all text-xs font-normal leading-6 text-muted">{request.customerEmail}</span>{request.customerWhatsApp ? <a href={`https://wa.me/${request.customerWhatsApp.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex min-h-9 items-center text-xs font-medium text-orange underline underline-offset-4">WhatsApp : {request.customerWhatsApp}<span className="sr-only"> (nouvel onglet)</span></a> : null}</dd></div><div><dt className="text-[10px] font-semibold uppercase tracking-wide text-muted">Reçue le</dt><dd className="mt-2 text-sm leading-6">{formatWorkspaceDate(request.createdAt, true)}</dd></div><div><dt className="text-[10px] font-semibold uppercase tracking-wide text-muted">Proposition</dt><dd className="mt-2 text-sm font-semibold">{formatAmount(request.quotedAmount)}</dd></div><div><dt className="text-[10px] font-semibold uppercase tracking-wide text-muted">Échéance</dt><dd className="mt-2 text-sm leading-6">{request.dueAt ? formatWorkspaceDate(request.dueAt, true) : "À convenir"}</dd></div></dl>
           <p className="mt-6 whitespace-pre-wrap break-words text-sm leading-8 text-night">{request.brief}</p>
         </section>
         <section className="rounded-xl border border-line bg-white p-5 sm:p-7" aria-labelledby="order-files-title"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">Les pièces du dossier</p><h2 id="order-files-title" className="mt-3 text-xl font-semibold tracking-tight">Documents de travail</h2><p className="mt-3 text-xs leading-6 text-muted">Références et documents partagés entre le client et l’équipe, distincts des produits livrés.</p><div className="mt-5"><FileList files={briefs} context="team" /></div></section>

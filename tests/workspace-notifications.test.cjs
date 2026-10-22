@@ -53,6 +53,7 @@ test("transactional workspace email outbox", async (t) => {
 
   await t.test("migration is repeatable and welcomes only future accounts", async () => {
     await pg.exec(migration); await pg.exec(migration);
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261022_workflow.sql"), "utf8"));
     assert.equal((await pg.query("SELECT count(*)::integer AS n FROM workspace_notifications")).rows[0].n, 0);
     await pg.exec("INSERT INTO customer_users(id,email,name,password_hash,consent_privacy,consent_version) VALUES(2,'new@example.test','New private name','hash',true,'test')");
     const rows = (await pg.query("SELECT kind,audience,customer_id FROM workspace_notifications")).rows;
@@ -171,7 +172,7 @@ test("transactional workspace email outbox", async (t) => {
       "@/lib/workspace-mail": mail, "@/lib/workspace-files": files,
       "next/cache": { revalidatePath() {} }, "next/navigation": { redirect: (path) => { throw new Error(`Redirect:${path}`); } },
     });
-    const saved = (await pg.query("INSERT INTO service_requests(customer_id,title,service,brief,status,quoted_amount) VALUES(1,'Private delivery title','first_cv','Private brief','in_progress',12000) RETURNING id,version")).rows[0];
+    const saved = (await pg.query("INSERT INTO service_requests(customer_id,title,service,brief,status,quoted_amount) VALUES(1,'Private delivery title','first_cv','Private brief','finalized',12000) RETURNING id,version")).rows[0];
     const content = Buffer.from("%PDF-1.4\nPrivate final product\n%%EOF\n");
     const [document] = await db.insert(workspaceSchema.requestFiles).values({
       requestId: saved.id, filename: "Private-final-product.pdf", mimeType: "application/pdf", size: content.length, content,
@@ -211,4 +212,32 @@ test("transactional workspace email outbox", async (t) => {
     assert.equal((await pg.query("SELECT status FROM service_requests WHERE id=$1", [saved.id])).rows[0].status, "delivered");
     assert.deepEqual(Buffer.from((await files.getWorkspaceFile(document.id)).content), content, "Provider failure leaves the published product downloadable by its owner");
   });
+  await t.test("review, finalization and price adjustment notices use generic content and authenticated links", async () => {
+    const id = (await pg.query("INSERT INTO service_requests(customer_id,title,service,brief) VALUES(1,'Private workflow title','first_cv','Private workflow brief') RETURNING id")).rows[0].id;
+    for (const type of ["awaiting_validation", "finalized", "quote_rejected"]) {
+      await pg.query("INSERT INTO request_events(request_id,type,actor_name,body,status) VALUES($1,$2,'Private actor','Private notes must never leave the account',$3)", [id, type, type === "quote_rejected" ? "reviewing" : type]);
+    }
+    const queued = (await pg.query("SELECT kind,audience,payload FROM workspace_notifications WHERE request_id=$1 ORDER BY id", [id])).rows;
+    assert.deepEqual(queued.map(row => [row.kind, row.audience]), [["awaiting_validation", "customer"], ["finalized", "team"], ["quote_rejected", "team"]]);
+    assert.ok(queued.every(row => row.payload === null));
+    mode = "ok";
+    const before = outgoing.length;
+    const result = await mail.drainWorkspaceNotifications({ requestId: id });
+    assert.equal(result.sent, 3);
+    const sent = outgoing.slice(before);
+    assert.deepEqual(sent[0].payload.to, ["old@example.test"]);
+    assert.deepEqual(sent[1].payload.to, [env.CONTACT_EMAIL]);
+    assert.deepEqual(sent[2].payload.to, [env.CONTACT_EMAIL]);
+    assert.match(sent[0].payload.subject, /validation/);
+    assert.match(sent[1].payload.subject, /validée par le client/);
+    assert.match(sent[2].payload.subject, /Ajustement/);
+    assert.ok(sent[0].payload.text.includes(`/espace/demandes/${id}`));
+    assert.ok(sent[1].payload.text.includes(`/admin/commandes/${id}`));
+    for (const call of sent) {
+      assert.doesNotMatch(JSON.stringify(call.payload), /Private/);
+      assert.equal("attachments" in call.payload, false);
+      assert.match(call.payload.html, /<html/);
+    }
+  });
+
 });

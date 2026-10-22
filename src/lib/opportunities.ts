@@ -1,7 +1,7 @@
 export type Opportunity = {
   slug: string; title: string; company: string; location: string; country: string; countryCode: string;
   contractType: string; experience: string | null; industry: string | null; workMode: string | null;
-  description: string; publishedAt: string | null; updatedAt: string; expiresAt: string | null;
+  description: string; matchingText?: string; publishedAt: string | null; updatedAt: string; expiresAt: string | null;
   sourceKind?: "feed" | "selection"; sourceName: string; sourceUrl: string; reference: string; verifiedAt: string;
 };
 export type OpportunityFilters = Partial<Record<"q" | "location" | "country" | "industry" | "contractType" | "experience" | "workMode", string>>;
@@ -10,6 +10,18 @@ export const MAX_SOURCE_AGE = 24 * 60 * 60 * 1000;
 const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const text = (value: unknown, max = 255) => typeof value === "string" ? value.trim().slice(0, max) : "";
 export const fold = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’']/g, " ").toLowerCase();
+
+// Plain text for private relevance matching, never rendered as recruiter HTML.
+export function postingMatchingText(value: unknown): string {
+  const sections = record(record(value).sections);
+  const named: Record<string, string> = { amp: "&", nbsp: " ", lt: "<", gt: ">", quot: '"', apos: "'", eacute: "é", egrave: "è", agrave: "à", ocirc: "ô", ccedil: "ç" };
+  return ["jobDescription", "qualifications"].map(key => text(record(sections[key]).text, 100_000)
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]*>/g, " ")
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, raw: string) => {
+      const code = raw[0] === "#" ? Number.parseInt(raw.slice(raw[1]?.toLowerCase() === "x" ? 2 : 1), raw[1]?.toLowerCase() === "x" ? 16 : 10) : NaN;
+      return Number.isInteger(code) && code > 31 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : named[raw.toLowerCase()] ?? entity;
+    }).replace(/\s+/g, " ").trim()).filter(Boolean).join(" ").slice(0, 16_000);
+}
 
 export function safeSourceUrl(value: unknown, hosts: readonly string[]): string | null {
   try {
@@ -63,9 +75,9 @@ export function normalizeAccorPosting(value: unknown, verifiedAt: string, now = 
     slug: `accor-${id}`, title, company: employer, location: text(location.city) || "Abidjan", country: "Côte d’Ivoire", countryCode: "CI",
     contractType: contracts[jobType] || "Contrat à consulter", industry: sectors[custom("Job-Category")] || "Hôtellerie",
     experience: experience[text(record(row.experienceLevel).id)] || null,
-    workMode: location.remote === true ? "Télétravail" : location.hybrid === true ? "Hybride" : "Sur site",
+    workMode: location.remote === true ? "Télétravail" : location.hybrid === true ? "Hybride" : location.remote === false && location.hybrid === false ? "Sur site" : null,
     description: `${employer} recrute à ${text(location.city) || "Abidjan"}.${scheduleConsistent && schedule[scheduleValue] ? " " + schedule[scheduleValue] + "." : ""} Retrouvez les missions, le profil recherché et les modalités de candidature dans l’annonce officielle.`,
-    publishedAt: new Date(time).toISOString(), updatedAt: new Date(time).toISOString(), expiresAt,
+    matchingText: postingMatchingText(row.jobAd), publishedAt: new Date(time).toISOString(), updatedAt: new Date(time).toISOString(), expiresAt,
     sourceName: "Accor · SmartRecruiters", sourceUrl, reference: text(row.refNumber) || id, verifiedAt,
   };
 }

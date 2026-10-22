@@ -23,10 +23,12 @@ test("Customer accounts and pending-request ownership",async t=>{
  const env={NEXT_PUBLIC_SITE_URL:"https://carriova.example",CONTACT_EMAIL:"contact@example.test",SUPPORT_EMAIL:"support@example.test",email:{enabled:false,transactionalEnabled:false,transactionalFrom:"Carriova <noreply@example.test>",baseUrl:"https://api.resend.com",apiKey:"fictional-test-key",from:"Carriova <noreply@example.test>"}};
  const renderer=await import("../src/lib/transactional-email.mjs");
  const actionMocks={...base,"@/lib/transactional-email.mjs":renderer,"@/lib/workspace-mail":{scheduleWorkspaceNotifications(){}},"@/lib/customer-auth":auth,"@/lib/customer-claims":claims,"@/lib/staff-password.mjs":passwords,"@/lib/security":load("src/lib/security.ts"),"@/lib/env":{serverEnv:env},"next/navigation":{redirect(path){throw new Redirect(path);}}};
+ const whatsapp=load("src/lib/whatsapp.ts",{"@/lib/countries":load("src/lib/countries.ts")});
+ actionMocks["@/lib/whatsapp"]=whatsapp;actionMocks["next/cache"]={revalidatePath(){}};
  const actions=load("src/lib/customer-actions.ts",actionMocks);
  const fd=data=>{const form=new FormData();for(const[k,v]of Object.entries(data))form.set(k,v);return form;};
  const password="Local-customer-test-passphrase";
- const signup=(email,name="Client de test")=>actions.customerSignup({},fd({name,email,password,confirmPassword:password,consentPrivacy:"on"}));
+ const signup=(email,name="Client de test")=>actions.customerSignup({},fd({name,email,password,confirmPassword:password,consentPrivacy:"on",whatsappCountry:"CI",whatsapp:"07 00 00 00 00"}));
  let customerId,ownedRequestId,claimedToken;
  await t.test("anonymous and staff cookies never grant customer access",async()=>{
   assert.equal(await auth.getCustomerSession(),null);values.set("carriova_staff",randomBytes(32).toString("base64url"));
@@ -45,6 +47,28 @@ test("Customer accounts and pending-request ownership",async t=>{
   assert.equal(values.get(auth.CLAIM_COOKIE),"");
   assert.equal((await pg.query("SELECT customer_id FROM customer_lead_claims")).rows[0].customer_id,customerId);
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM request_events")).rows[0].n,1);
+ });
+ await t.test("WhatsApp is required for new accounts, normalized and separate from marketing",async()=>{
+  const stored=(await pg.query("SELECT whatsapp,consent_marketing,consent_version FROM customer_users WHERE id=$1",[customerId])).rows[0];
+  assert.equal(stored.whatsapp,"+2250700000000");assert.equal(stored.consent_marketing,false);assert.equal(stored.consent_version,"2026-10-22");
+  for(const whatsapp of ["", "invalid", "+22512", "0700000000<script>"]){
+   const result=await actions.customerSignup({},fd({name:"Numéro test",email:"missing-phone@example.test",password,confirmPassword:password,consentPrivacy:"on",whatsappCountry:"CI",whatsapp}));
+   assert.equal(result.ok,false);assert.ok(result.fieldErrors.whatsapp);
+  }
+  assert.equal((await pg.query("SELECT count(*)::int AS n FROM customer_users WHERE email='missing-phone@example.test'")).rows[0].n,0);
+ });
+ await t.test("WhatsApp updates affect only the authenticated account and reject stale changes",async()=>{
+  const other=(await pg.query("INSERT INTO customer_users(email,name,password_hash,consent_privacy,consent_version) VALUES('phone-owner@example.test','Autre compte','unused',true,'2026-10-18') RETURNING id")).rows[0];
+  const changed=await actions.customerUpdateWhatsApp({},fd({customerId:String(other.id),whatsappCountry:"FR",whatsapp:"06 01 02 03 04",expectedWhatsApp:"+2250700000000",consentMarketing:"on"}));
+  assert.equal(changed.ok,true);assert.equal(changed.whatsapp,"+33601020304");
+  const own=(await pg.query("SELECT whatsapp,consent_marketing FROM customer_users WHERE id=$1",[customerId])).rows[0];
+  assert.equal(own.whatsapp,"+33601020304");assert.equal(own.consent_marketing,false);
+  assert.equal((await pg.query("SELECT whatsapp FROM customer_users WHERE id=$1",[other.id])).rows[0].whatsapp,null);
+  const stale=await actions.customerUpdateWhatsApp({},fd({whatsappCountry:"CI",whatsapp:"0700000000",expectedWhatsApp:"+2250700000000"}));
+  assert.equal(stale.ok,false);assert.match(stale.message,/autre fenêtre/);
+  const session=values.get(auth.CUSTOMER_COOKIE);values.delete(auth.CUSTOMER_COOKIE);
+  await assert.rejects(actions.customerUpdateWhatsApp({},fd({whatsappCountry:"CI",whatsapp:"0700000000",expectedWhatsApp:""})),Redirect);
+  values.set(auth.CUSTOMER_COOKIE,session);
  });
  await t.test("pending token is single use and cannot transfer ownership",async()=>{
   const second=(await pg.query("INSERT INTO customer_users(email,name,password_hash,consent_privacy,consent_version) VALUES('second@example.test','Second test','unused',true,'2026-10-18') RETURNING id")).rows[0];
@@ -177,7 +201,7 @@ test("Customer accounts and pending-request ownership",async t=>{
 
  await t.test("customer signup, change and reset accept eight characters and reject seven",async()=>{
   const email="minimum-eight@example.test",short="Seven7!",initial="Client8!",changed="Change8!",reset="Reset88!";
-  const signupData={name:"Client minimum",email,password:short,confirmPassword:short,consentPrivacy:"on"};
+  const signupData={name:"Client minimum",email,password:short,confirmPassword:short,consentPrivacy:"on",whatsappCountry:"CI",whatsapp:"07 00 00 00 00"};
   const rejected=await actions.customerSignup({},fd(signupData));
   assert.equal(rejected.ok,false);assert.ok(rejected.fieldErrors.password);
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM customer_users WHERE email=$1",[email])).rows[0].n,0);

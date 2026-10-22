@@ -89,7 +89,7 @@ export async function getWorkspaceFile(id: number, context: WorkspaceContext = "
   const ownership = customerId === undefined ? undefined : eq(serviceRequests.customerId, customerId);
   const published = customerId === undefined ? undefined : or(eq(requestFiles.kind, "brief"), sql`exists (
     select 1 from ${requestEvents} where ${requestEvents.requestId} = ${requestFiles.requestId}
-    and ${requestEvents.type} = 'delivered' and ${requestEvents.createdAt} >= ${requestFiles.createdAt}
+    and ${requestEvents.type} = case when ${requestFiles.kind} = 'review' then 'awaiting_validation' else 'delivered' end and ${requestEvents.createdAt} >= ${requestFiles.createdAt}
   )`);
   const [file] = await getDb().select({ filename: requestFiles.filename, mimeType: requestFiles.mimeType, size: requestFiles.size, content: requestFiles.content })
     .from(requestFiles).innerJoin(serviceRequests, eq(serviceRequests.id, requestFiles.requestId))

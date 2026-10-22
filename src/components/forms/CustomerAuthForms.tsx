@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { customerSignup, customerLogin, customerChangePassword, customerRequestReset, customerResetPassword } from "@/lib/customer-actions";
+import { WhatsAppField } from "@/components/forms/WhatsAppField";
 import type { ActionState } from "@/lib/actions";
 import { CareerIcon } from "@/components/brand/CareerIcon";
 
@@ -35,6 +36,7 @@ function AuthForm({ mode, token }: { mode: Mode; token?: string }) {
       <fieldset disabled={pending} className="min-w-0 space-y-5">
         {mode === "signup" ? <AuthField name="name" label="Nom et prénom" autoComplete="name" error={state.fieldErrors?.name} /> : null}
         {["signup", "login", "requestReset"].includes(mode) ? <AuthField name="email" label="Adresse e-mail" type="email" autoComplete={mode === "login" ? "username" : "email"} error={state.fieldErrors?.email} /> : null}
+        {mode === "signup" ? <WhatsAppField error={state.fieldErrors?.whatsapp} /> : null}
         {mode === "changePassword" ? <AuthField name="currentPassword" label="Mot de passe actuel" type="password" autoComplete="current-password" error={state.fieldErrors?.currentPassword} /> : null}
         {mode !== "requestReset" ? <AuthField name={mode === "changePassword" ? "newPassword" : "password"} label={mode === "changePassword" || mode === "resetPassword" ? "Nouveau mot de passe" : "Mot de passe"} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : 8} help={mode === "login" ? undefined : passwordHelp} error={state.fieldErrors?.[mode === "changePassword" ? "newPassword" : "password"]} /> : null}
         {["signup", "changePassword", "resetPassword"].includes(mode) ? <AuthField name="confirmPassword" label="Confirmer le mot de passe" type="password" autoComplete="new-password" minLength={8} error={state.fieldErrors?.confirmPassword} /> : null}

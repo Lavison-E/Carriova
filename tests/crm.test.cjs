@@ -91,7 +91,7 @@ function mutations({ currentVersion = 0, failHistory = false, actor = async () =
 test("qualification uses the three documented steps and validates every server-side choice", () => {
   assert.deepEqual(qualification.qualificationSteps.map((step) => step.title), ["Votre profil", "Votre besoin", "Votre demande"]);
   assert.equal(qualification.validateQualification(data()).ok, true);
-  for (const key of Object.keys(qualification.qualificationOptions)) {
+  for (const key of Object.keys(qualification.qualificationOptions).filter(key => key !== "paymentReadiness")) {
     const result = qualification.validateQualification(data({ [key]: "__proto__" }));
     assert.equal(result.ok, false);
     assert.ok(result.fieldErrors[key]);
@@ -298,4 +298,15 @@ test("qualification need links accept only a single known catalogue need", () =>
   for (const value of [undefined, null, "", "__proto__", "job", "<script>", ["first_cv"], ["first_cv", "interview"]]) {
     assert.equal(qualification.getInitialQualificationNeed(value), null);
   }
+});
+
+
+test("qualification no longer asks or infers purchase willingness", () => {
+  for (const value of ["", "ready", "forged"]) {
+    const result = qualification.validateQualification(data({ paymentReadiness: value }));
+    assert.equal(result.ok, true);
+    assert.equal(result.data.paymentReadiness, "not_asked");
+  }
+  assert.ok(qualification.qualificationSteps.every(step => !step.fields.includes("paymentReadiness")));
+  assert.equal(qualification.qualificationLabel("paymentReadiness", "advisor"), "J’aimerais d’abord échanger avec un conseiller");
 });
