@@ -60,7 +60,7 @@ export default async function EmploiPage({
   return (
     <>
       <JsonLd data={breadcrumbJsonLd(crumbs.map((c) => ({ name: c.label, path: c.href })))} />
-      <PageHero
+      <PageHero image={{ src: "/images/Emploi Carriova.png", alt: "Un professionnel consulte des opportunités sur son ordinateur, avec son CV à portée de main.", width: 1672, height: 941, caption: "Votre prochain chapitre commence par une piste." }}
         eyebrow="Emploi & opportunités"
         title="Trouvez une opportunité qui vous correspond."
         text="Un métier, un lieu, une nouvelle ambition. Affinez votre recherche et préparez une candidature adaptée à chaque opportunité."

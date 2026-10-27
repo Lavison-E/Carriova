@@ -30,7 +30,7 @@ export default function ResourcesPage() {
   return (
     <>
       <JsonLd data={breadcrumbJsonLd(crumbs.map((c) => ({ name: c.label, path: c.href })))} />
-      <PageHero
+      <PageHero image={{ src: "/images/Ressources Carriova.png", alt: "Une professionnelle prend des notes en consultant des ressources sur son ordinateur.", width: 1122, height: 1402, caption: "Des repères pour avancer avec méthode." }}
         eyebrow="Ressources"
         title="Apprendre, puis agir."
         text="Les bonnes questions, des conseils pratiques et le temps de faire le point. Retrouvez ici de quoi préparer votre prochain pas professionnel."

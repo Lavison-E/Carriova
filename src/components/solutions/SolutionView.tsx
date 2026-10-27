@@ -22,6 +22,7 @@ export function SolutionView({ content, faqs }: { content: SolutionPageContent; 
       <JsonLd data={breadcrumbJsonLd(crumbs.map((c) => ({ name: c.label, path: c.href })))} />
       {displayedFaqs.length ? <JsonLd data={faqJsonLd(displayedFaqs)} /> : null}
       <PageHero
+        image={content.slug === "coaching" ? { src: "/images/Caoching Carriova.png", alt: "Une conseillère accompagne un professionnel lors d’un échange autour de son parcours.", width: 1122, height: 1402, caption: "Un temps d’échange pour éclairer la prochaine étape." } : undefined}
         eyebrow={content.eyebrow}
         title={content.title}
         text={content.text}
