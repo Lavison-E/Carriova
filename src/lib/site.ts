@@ -179,6 +179,8 @@ export const ecosystemModules = [
 ] as const;
 
 export const solutions = [
+  { slug: "linkedin", title: "Profil LinkedIn", short: "Un titre, un résumé et des expériences qui rendent votre parcours lisible.", href: "/solutions/linkedin", cta: "Découvrir les formules LinkedIn", audience: "Professionnels en recherche de visibilité" },
+  { slug: "entretien", title: "Coaching entretien", short: "Préparez votre pitch et entraînez-vous avec un conseiller pour votre prochain entretien.", href: "/solutions/entretien", cta: "Préparer mon entretien", audience: "Candidats avec un entretien à préparer" },
   {
     slug: "cv",
     title: "CV professionnel",
@@ -349,6 +351,8 @@ export const footerGroups = [
       { href: "/solutions/matching", label: "Matching" },
       { href: "/solutions/coaching", label: "Coaching" },
       { href: "/solutions/expertise", label: "Expertise" },
+      { href: "/solutions/linkedin", label: "LinkedIn" },
+      { href: "/solutions/entretien", label: "Entretiens" },
     ],
   },
   {

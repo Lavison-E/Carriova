@@ -10,14 +10,14 @@ import { workspaceStatusOptions, type CustomerWorkspace, type TeamRequestFilters
 
 const summaryColumns = {
   id: serviceRequests.id, title: serviceRequests.title, service: serviceRequests.service,
-  status: serviceRequests.status, quotedAmount: serviceRequests.quotedAmount, dueAt: serviceRequests.dueAt,
+  offerSnapshot: serviceRequests.offerSnapshot, status: serviceRequests.status, quotedAmount: serviceRequests.quotedAmount, dueAt: serviceRequests.dueAt,
   version: serviceRequests.version, customerName: customerUsers.name, customerEmail: customerUsers.email, customerWhatsApp: customerUsers.whatsapp,
   createdAt: serviceRequests.createdAt, updatedAt: serviceRequests.updatedAt,
 };
 function summary(row: typeof serviceRequests.$inferSelect & { customerName: string; customerEmail: string; customerWhatsApp: string | null }): WorkspaceRequestSummary;
 function summary(row: Omit<WorkspaceRequestSummary, "createdAt" | "updatedAt" | "dueAt"> & { createdAt: Date; updatedAt: Date; dueAt: Date | null }): WorkspaceRequestSummary;
 function summary(row: Omit<WorkspaceRequestSummary, "createdAt" | "updatedAt" | "dueAt"> & { createdAt: Date; updatedAt: Date; dueAt: Date | null }): WorkspaceRequestSummary {
-  return { id: row.id, title: row.title, service: row.service, status: row.status, quotedAmount: row.quotedAmount,
+  return { id: row.id, title: row.title, service: row.service, offerSnapshot: row.offerSnapshot, status: row.status, quotedAmount: row.quotedAmount,
     dueAt: row.dueAt?.toISOString() ?? null, version: row.version, customerName: row.customerName,
     customerEmail: row.customerEmail, customerWhatsApp: row.customerWhatsApp, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }

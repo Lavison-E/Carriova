@@ -18,7 +18,7 @@ function AuthField({ name, label, type = "text", autoComplete, minLength, error,
   return <div><label htmlFor={id} className="text-xs font-semibold text-night">{label}</label><div className="relative mt-2"><input id={id} name={name} required type={password && visible ? "text" : type} autoComplete={autoComplete} minLength={minLength} maxLength={password ? 256 : name === "name" ? 120 : 255} aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : help ? `${id}-help` : undefined} className={`h-12 w-full rounded-lg border border-line bg-white px-3 text-sm text-night focus:border-night ${password ? "pr-20" : ""}`} />{password ? <button type="button" onClick={() => setVisible((value) => !value)} aria-label={`${visible ? "Masquer" : "Afficher"} ${label.toLocaleLowerCase("fr")}`} aria-pressed={visible} className="absolute inset-y-0 right-0 min-w-16 px-3 text-[10px] font-medium text-muted hover:text-night">{visible ? "Masquer" : "Afficher"}</button> : null}</div>{help ? <p id={`${id}-help`} className="mt-2 text-[11px] leading-5 text-muted">{help}</p> : null}{error ? <p id={`${id}-error`} className="mt-2 text-xs leading-5 text-orange">{error}</p> : null}</div>;
 }
 
-function AuthForm({ mode, token }: { mode: Mode; token?: string }) {
+function AuthForm({ mode, token, returnTo }: { mode: Mode; token?: string; returnTo?: string | null }) {
   const [state, action, pending] = useActionState(actions[mode], initial);
   const [response, setResponse] = useState({ state, revision: 0 });
   const feedbackRef = useRef<HTMLDivElement>(null);
@@ -32,6 +32,7 @@ function AuthForm({ mode, token }: { mode: Mode; token?: string }) {
   return <div>
     {state.message ? <div ref={feedbackRef} tabIndex={-1} role="status" className={`mb-6 scroll-mt-24 rounded-lg border p-4 text-xs leading-6 outline-none ${state.ok ? "border-[#c4d6c8] bg-[#edf4ee] text-[#285236]" : "border-orange/30 bg-[#fff7f0] text-orange"}`}>{state.message}</div> : null}
     {completeReset ? <Link href="/compte/connexion" className="inline-flex min-h-12 items-center gap-5 rounded-lg bg-night px-5 text-sm font-semibold text-white">Me connecter <CareerIcon name="arrow" className="h-4 w-4" /></Link> : <form key={response.revision} action={action} onReset={(event) => event.preventDefault()} aria-busy={pending} className="space-y-5">
+      {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
       {token ? <input type="hidden" name="token" value={token} /> : null}
       <fieldset disabled={pending} className="min-w-0 space-y-5">
         {mode === "signup" ? <AuthField name="name" label="Nom et prénom" autoComplete="name" error={state.fieldErrors?.name} /> : null}
@@ -48,7 +49,7 @@ function AuthForm({ mode, token }: { mode: Mode; token?: string }) {
   </div>;
 }
 
-export function CustomerSignupForm() { return <AuthForm mode="signup" />; }
-export function CustomerLoginForm() { return <AuthForm mode="login" />; }
+export function CustomerSignupForm({ returnTo }: { returnTo?: string | null }) { return <AuthForm mode="signup" returnTo={returnTo} />; }
+export function CustomerLoginForm({ returnTo }: { returnTo?: string | null }) { return <AuthForm mode="login" returnTo={returnTo} />; }
 export function CustomerPasswordForm() { return <AuthForm mode="changePassword" />; }
 export function CustomerRecoveryForm({ token }: { token?: string }) { return <AuthForm mode={token ? "resetPassword" : "requestReset"} token={token} />; }

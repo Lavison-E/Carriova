@@ -1,3 +1,4 @@
+const commercial = require("./helpers/commercial-fixture.cjs");
 const assert=require("node:assert/strict");
 const test=require("node:test");
 const {randomBytes}=require("node:crypto");
@@ -12,7 +13,7 @@ test("Customer accounts and pending-request ownership",async t=>{
  const customerSchema=load("src/db/customer-schema.ts",{"./schema":core});
  const crm=load("src/db/crm-schema.ts",{"./schema":core});
  const workspace=load("src/db/workspace-schema.ts",{"./schema":core,"./customer-schema":customerSchema});
- const qualification=load("src/lib/qualification.ts", { "@/lib/countries": load("src/lib/countries.ts") });
+ const qualification=load("src/lib/qualification.ts", { ...commercial, "@/lib/countries": load("src/lib/countries.ts") });
  const passwords=await import("../src/lib/staff-password.mjs");
  const values=new Map();let lastCookie;
  const jar={get:name=>values.has(name)?{value:values.get(name)}:undefined,set(name,value,options){values.set(name,value);lastCookie={name,value,options};}};
@@ -22,10 +23,11 @@ test("Customer accounts and pending-request ownership",async t=>{
  class Redirect extends Error{constructor(path){super(path);this.path=path;}}
  const env={NEXT_PUBLIC_SITE_URL:"https://carriova.example",CONTACT_EMAIL:"contact@example.test",SUPPORT_EMAIL:"support@example.test",email:{enabled:false,transactionalEnabled:false,transactionalFrom:"Carriova <noreply@example.test>",baseUrl:"https://api.resend.com",apiKey:"fictional-test-key",from:"Carriova <noreply@example.test>"}};
  const renderer=await import("../src/lib/transactional-email.mjs");
- const actionMocks={...base,"@/lib/transactional-email.mjs":renderer,"@/lib/workspace-mail":{scheduleWorkspaceNotifications(){}},"@/lib/customer-auth":auth,"@/lib/customer-claims":claims,"@/lib/staff-password.mjs":passwords,"@/lib/security":load("src/lib/security.ts"),"@/lib/env":{serverEnv:env},"next/navigation":{redirect(path){throw new Redirect(path);}}};
+ const actionMocks={...commercial,...base,"@/lib/transactional-email.mjs":renderer,"@/lib/workspace-mail":{scheduleWorkspaceNotifications(){}},"@/lib/customer-auth":auth,"@/lib/customer-claims":claims,"@/lib/staff-password.mjs":passwords,"@/lib/security":load("src/lib/security.ts"),"@/lib/env":{serverEnv:env},"next/navigation":{redirect(path){throw new Redirect(path);}}};
  const whatsapp=load("src/lib/whatsapp.ts",{"@/lib/countries":load("src/lib/countries.ts")});
  actionMocks["@/lib/whatsapp"]=whatsapp;actionMocks["next/cache"]={revalidatePath(){}};
  const actions=load("src/lib/customer-actions.ts",actionMocks);
+ const qualificationActions=load("src/lib/qualification-actions.ts",{...base,"@/db/schema":core,"@/db/crm-schema":crm,"@/lib/qualification":qualification,"@/lib/customer-auth":auth,"@/lib/customer-claims":claims,"@/lib/workspace-mail":{scheduleWorkspaceNotifications(){}}});
  const fd=data=>{const form=new FormData();for(const[k,v]of Object.entries(data))form.set(k,v);return form;};
  const password="Local-customer-test-passphrase";
  const signup=(email,name="Client de test")=>actions.customerSignup({},fd({name,email,password,confirmPassword:password,consentPrivacy:"on",whatsappCountry:"CI",whatsapp:"07 00 00 00 00"}));
@@ -34,16 +36,21 @@ test("Customer accounts and pending-request ownership",async t=>{
   assert.equal(await auth.getCustomerSession(),null);values.set("carriova_staff",randomBytes(32).toString("base64url"));
   assert.equal(await auth.getCustomerSession(),null);await assert.rejects(auth.requireCustomer(),auth.CustomerUnauthorizedError);
  });
- await t.test("signup claims only the bearer request, never historical leads matching email",async()=>{
+ await t.test("signup opens profile onboarding and claims only the bearer request",async()=>{
   const raw=randomBytes(32).toString("base64url");
   const lead=(await pg.query("INSERT INTO leads(first_name,email,type) VALUES('Demande test','','qualification') RETURNING id")).rows[0];
   await pg.query("INSERT INTO lead_qualifications(lead_id,country,profile,discovery_source,need,cv_status,timeline,budget,payment_readiness,contact_whatsapp,consent_version,privacy_notice) VALUES($1,'cote_ivoire','job_seeker','linkedin','improve_cv','improve','week','10000_20000','discuss',false,'2026-10-18','Consentement test')",[lead.id]);
+  const expectedOffer=commercial["@/lib/offer-selection"].selectOffer("cv-cleaning","improve_cv").snapshot;
+  await pg.query("UPDATE lead_qualifications SET offer_snapshot=$1 WHERE lead_id=$2",[JSON.stringify(expectedOffer),lead.id]);
   await pg.query("INSERT INTO leads(first_name,email,type) VALUES('Historique privé','client@example.test','contact')");
   await pg.query("INSERT INTO customer_lead_claims(token_hash,lead_id,expires_at) VALUES($1,$2,now()+interval '1 day')",[auth.customerTokenHash(raw),lead.id]);
   claimedToken=raw;values.set(auth.CLAIM_COOKIE,raw);
-  await assert.rejects(signup("client@example.test"),e=>e instanceof Redirect&&e.path==="/espace");
-  const user=await auth.getCustomerSession();customerId=user.id;assert.equal(user.email,"client@example.test");assert.equal(user.passwordHash,undefined);
-  const rows=(await pg.query("SELECT * FROM service_requests")).rows;assert.equal(rows.length,1);assert.equal(rows[0].customer_id,customerId);assert.equal(rows[0].lead_id,lead.id);ownedRequestId=rows[0].id;
+  await assert.rejects(signup("client@example.test"),e=>e instanceof Redirect&&e.path==="/espace/profil?bienvenue=1");
+  const user=await auth.getCustomerSession();customerId=user.id;assert.equal(user.email,"client@example.test");assert.equal(user.name,"Client de test");assert.equal(user.passwordHash,undefined);
+  const identity=(await pg.query("SELECT name,email,whatsapp FROM customer_users WHERE id=$1",[customerId])).rows[0];
+  assert.deepEqual(identity,{name:"Client de test",email:"client@example.test",whatsapp:"+2250700000000"});
+  assert.equal((await pg.query("SELECT count(*)::int AS n FROM customer_career_profiles WHERE customer_id=$1",[customerId])).rows[0].n,0);
+  const rows=(await pg.query("SELECT * FROM service_requests")).rows;assert.equal(rows.length,1);assert.equal(rows[0].customer_id,customerId);assert.equal(rows[0].lead_id,lead.id);assert.deepEqual(rows[0].offer_snapshot,expectedOffer);assert.equal(rows[0].quoted_amount,null);ownedRequestId=rows[0].id;
   assert.equal(values.get(auth.CLAIM_COOKIE),"");
   assert.equal((await pg.query("SELECT customer_id FROM customer_lead_claims")).rows[0].customer_id,customerId);
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM request_events")).rows[0].n,1);
@@ -83,9 +90,17 @@ test("Customer accounts and pending-request ownership",async t=>{
   assert.equal((await pg.query("SELECT password_hash FROM customer_users WHERE id=$1",[customerId])).rows[0].password_hash,before);
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM service_requests")).rows[0].n,1);
  });
+ await t.test("authenticated qualification returns the saved request and preserves its server-priced offer",async()=>{
+  const result=await qualificationActions.submitQualification({},fd({fullName:"Client connecté",whatsapp:"+2250700000000",country:"CI",profile:"employed",discoverySource:"linkedin",need:"executive",offer:"executive",cvStatus:"improve",timeline:"month",targetOffer:"",difficulty:"",budget:"over_20000",contactWhatsApp:"yes",consentPrivacy:"on",priceAmount:"1",offerSnapshot:JSON.stringify({priceAmount:1})}));
+  assert.equal(result.ok,true,result.message);assert.ok(result.requestId);
+  const request=(await pg.query("SELECT customer_id,offer_snapshot,quoted_amount,lead_id FROM service_requests WHERE id=$1",[result.requestId])).rows[0];
+  assert.equal(request.customer_id,customerId);assert.equal(request.offer_snapshot.slug,"executive");assert.equal(request.offer_snapshot.priceAmount,60000);assert.equal(request.quoted_amount,null);
+  const saved=(await pg.query("SELECT offer_snapshot FROM lead_qualifications WHERE lead_id=$1",[request.lead_id])).rows[0];
+  assert.deepEqual(saved.offer_snapshot,request.offer_snapshot);
+ });
  await t.test("session cookies are HttpOnly and logout revokes the database session",async()=>{
   await assert.rejects(actions.customerLogout(),Redirect);assert.equal(await auth.getCustomerSession(),null);
-  await assert.rejects(actions.customerLogin({},fd({email:"client@example.test",password})),Redirect);
+  await assert.rejects(actions.customerLogin({},fd({email:"client@example.test",password,returnTo:"/espace/nouvelle-demande?service=improve_cv&offer=cv-cleaning"})),e=>e instanceof Redirect&&e.path==="/espace/nouvelle-demande?service=improve_cv&offer=cv-cleaning");
   assert.equal(lastCookie.options.httpOnly,true);assert.equal(lastCookie.options.sameSite,"lax");assert.equal(lastCookie.options.path,"/");
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM customer_sessions WHERE user_id=$1",[customerId])).rows[0].n,1);
   await pg.query("UPDATE customer_users SET enabled=false WHERE id=$1",[customerId]);assert.equal(await auth.getCustomerSession(),null);
@@ -216,6 +231,20 @@ test("Customer accounts and pending-request ownership",async t=>{
   assert.deepEqual(await counts(user.id),{sessions:0,resets:0});
   await assert.rejects(actions.customerLogin({},fd({email,password:reset})),Redirect);
   assert.equal((await auth.requireCustomer()).id,user.id);
+ });
+
+ await t.test("signup and login resume the selected offer and never follow an external return URL",async()=>{
+  const candidatePassword="Selected-offer-test-passphrase";
+  for(const [index,returnTo,destination] of [
+   [1,"/espace/nouvelle-demande?offer=linkedin-complet","/espace/nouvelle-demande?service=linkedin&offer=linkedin-complet"],
+   [2,"https://outside.example/steal","/espace/profil?bienvenue=1"],
+  ]){
+   const email=`return-offer-${index}@example.test`;
+   values.clear();
+   await assert.rejects(actions.customerSignup({},fd({name:"Client offre",email,password:candidatePassword,confirmPassword:candidatePassword,consentPrivacy:"on",whatsappCountry:"CI",whatsapp:"0700000000",returnTo})),e=>e instanceof Redirect&&e.path===destination);
+   const expectedLogin=index===1?destination:"/espace";
+   await assert.rejects(actions.customerLogin({},fd({email,password:candidatePassword,returnTo})),e=>e instanceof Redirect&&e.path===expectedLogin);
+  }
  });
 
 });

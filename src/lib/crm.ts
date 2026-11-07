@@ -1,3 +1,5 @@
+import type { OfferSnapshot } from "@/lib/offer-selection";
+
 export const crmStatusOptions = [
   { value: "new", label: "Nouveau" },
   { value: "to_qualify", label: "À qualifier" },
@@ -39,6 +41,7 @@ export type CrmHistoryItem = {
 export type CrmLeadDetail = CrmLeadSummary & {
   message: string | null; consentPrivacy: boolean; consentMarketing: boolean;
   qualification: null | {
+    offerSnapshot: OfferSnapshot | null;
     discoverySource: string; cvStatus: string; timeline: string;
     targetOffer: string | null; difficulty: string | null;
     budget: string; paymentReadiness: string; contactWhatsApp: "yes" | "no";

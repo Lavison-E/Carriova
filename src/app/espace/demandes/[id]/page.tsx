@@ -1,9 +1,10 @@
+import { PaymentPanel } from "@/components/workspace/PaymentPanel";
 import { RefreshButton } from "@/components/workspace/RefreshButton";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CareerIcon } from "@/components/brand/CareerIcon";
 import { CustomerDecisionForm, MessageForm, UploadForm } from "@/components/workspace/WorkspaceForms";
-import { FileList, RequestProgress, RequestStatusBadge, WorkspaceHeading, WorkspaceUnavailable, formatAmount, formatWorkspaceDate } from "@/components/workspace/WorkspaceUi";
+import { FileList, RequestOfferSummary, RequestProgress, RequestStatusBadge, WorkspaceHeading, WorkspaceUnavailable, formatAmount, formatWorkspaceDate } from "@/components/workspace/WorkspaceUi";
 import { loadWorkspaceData } from "@/components/workspace/WorkspaceData";
 import { getCustomerRequest } from "@/lib/workspace-queries";
 import { workspaceServiceLabel } from "@/lib/workspace";
@@ -24,6 +25,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const closed = ["completed", "cancelled"].includes(request.status);
   return <>
     <WorkspaceHeading action={<RefreshButton />} eyebrow={`Demande ${String(id).padStart(3, "0")} · ${workspaceServiceLabel(request.service)}`} title={request.title} back="/espace/demandes" />
+    <RequestOfferSummary offer={request.offerSnapshot} />
+    <PaymentPanel requestId={request.id} version={request.version} />
     <section aria-label="Avancement" className="mb-6 rounded-xl border border-line bg-white p-5 sm:p-7"><div className="mb-6 flex flex-wrap items-center justify-between gap-3"><RequestStatusBadge status={request.status} /><p className="text-[10px] leading-6 text-muted">Dernière mise à jour : {formatWorkspaceDate(request.updatedAt, true)}</p></div><RequestProgress status={request.status} /></section>
     {["quoted", "awaiting_validation", "delivered"].includes(request.status) ? <div className="mb-6"><CustomerDecisionForm key={request.status} request={request} /></div> : null}
     <nav aria-label="Sections de la demande" className="mb-6 flex flex-wrap gap-x-6 gap-y-2 border-b border-line pb-4">{[{ href: "#validation", label: "Réalisation à valider" }, { href: "#livrables", label: "Projet final" }, { href: "#documents", label: "Documents" }, { href: "#conversation", label: "Conversation" }, { href: "#historique", label: "Historique" }].map((link) => <a key={link.href} href={link.href} className="inline-flex min-h-9 items-center text-xs font-medium text-muted hover:text-night">{link.label}</a>)}</nav>

@@ -1,4 +1,5 @@
 import { qualificationOptions } from "@/lib/qualification";
+import type { OfferSnapshot } from "@/lib/offer-selection";
 
 export const workspaceStatusOptions = [
   { value: "received", label: "Demande" },
@@ -43,7 +44,7 @@ export function workspaceServiceLabel(service: string) {
 }
 export type WorkspaceRequestSummary = {
   id: number; title: string; service: string; status: WorkspaceStatus;
-  quotedAmount: number | null; dueAt: string | null; version: number;
+  quotedAmount: number | null; dueAt: string | null; version: number; offerSnapshot: OfferSnapshot | null;
   customerName: string; customerEmail: string; customerWhatsApp: string | null; createdAt: string; updatedAt: string;
 };
 export type WorkspaceMessage = {

@@ -1,4 +1,5 @@
 import { countryOptions } from "@/lib/countries";
+import { selectOffer, type OfferSnapshot } from "@/lib/offer-selection";
 
 export const QUALIFICATION_CONSENT_VERSION = "2026-10-22";
 export const QUALIFICATION_PRIVACY_NOTICE = "J’accepte que Carriova utilise les informations communiquées pour traiter ma demande et, si je le souhaite, me recontacte au sujet de cette demande.";
@@ -28,6 +29,10 @@ export const qualificationOptions = {
     { value: "interview", label: "Coaching entretien" },
     { value: "career_growth", label: "Coaching carrière" },
     { value: "opportunities", label: "Recherche d’opportunités ciblée" },
+    { value: "linkedin", label: "Visibilité professionnelle et LinkedIn" },
+    { value: "executive", label: "Accompagnement Executive" },
+    { value: "special_file", label: "Dossier spécial : bourse, formation ou concours" },
+    { value: "organisation", label: "Accompagnement pour une organisation" },
   ],
   cvStatus: [
     { value: "improve", label: "Oui, et je souhaite l’améliorer" },
@@ -101,6 +106,7 @@ export type QualificationInput = Omit<Answers, "targetOffer" | "difficulty" | "p
   fullName: string;
   whatsapp: string;
   message: string;
+  offerSnapshot: OfferSnapshot | null;
   consentPrivacy: boolean;
   consentMarketing: boolean;
 };
@@ -149,6 +155,8 @@ export function validateQualification(formData: FormData): {
       fieldErrors[key] = "Sélectionnez une réponse parmi les choix proposés.";
     }
   }
+  const selectedOffer = selectOffer(formData.get("offer"), text("need"));
+  if (selectedOffer.error) fieldErrors.offer = selectedOffer.error;
   const message = text("message");
   if (message.length > 4000) fieldErrors.message = "Limitez votre message à 4 000 caractères.";
   const consentPrivacy = text("consentPrivacy") === "on";
@@ -158,6 +166,6 @@ export function validateQualification(formData: FormData): {
   return {
     ok: true,
     fieldErrors,
-    data: { ...answers, fullName, whatsapp, message, consentPrivacy, consentMarketing } as QualificationInput,
+    data: { ...answers, fullName, whatsapp, message, offerSnapshot: selectedOffer.snapshot, consentPrivacy, consentMarketing } as QualificationInput,
   };
 }

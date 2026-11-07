@@ -1,6 +1,7 @@
-import { customType, index, integer, pgTable, serial, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { customType, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import { customerUsers } from "./customer-schema";
 import { leads } from "./schema";
+import type { OfferSnapshot } from "@/lib/offer-selection";
 import type { WorkspaceFileKind, WorkspaceStatus } from "@/lib/workspace";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -15,6 +16,7 @@ export const serviceRequests = pgTable("service_requests", {
   title: varchar("title", { length: 160 }).notNull(),
   service: varchar("service", { length: 40 }).notNull(),
   brief: text("brief").notNull(),
+  offerSnapshot: jsonb("offer_snapshot").$type<OfferSnapshot>(),
   status: varchar("status", { length: 40 }).$type<WorkspaceStatus>().notNull().default("received"),
   quotedAmount: integer("quoted_amount"),
   dueAt: timestamp("due_at", { withTimezone: true }),

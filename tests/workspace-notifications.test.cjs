@@ -1,3 +1,4 @@
+const commercial = require("./helpers/commercial-fixture.cjs");
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { resolve } = require("node:path");
@@ -12,14 +13,14 @@ class CustomerUnauthorizedError extends Error {}
 test("transactional workspace email outbox", async (t) => {
   const pg = new PGlite(); await pg.waitReady; t.after(() => pg.close());
   await pg.exec(CORE_LEADS_SQL);
-  for (const name of ["20261018_staff.sql", "20261018_customer.sql", "20261018_workspace.sql"]) await pg.exec(readFileSync(resolve(__dirname, "../migrations", name), "utf8"));
+  for (const name of ["20261018_staff.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261102_commercial_offers.sql"]) await pg.exec(readFileSync(resolve(__dirname, "../migrations", name), "utf8"));
   await pg.exec("INSERT INTO customer_users(id,email,name,password_hash,consent_privacy,consent_version) VALUES(1,'old@example.test','Old private name','hash',true,'test')");
   const migration = readFileSync(resolve(__dirname, "../migrations/20261018_notifications.sql"), "utf8");
   const core = load("src/db/schema.ts");
   const customers = load("src/db/customer-schema.ts", { "./schema": core });
   const workspaceSchema = load("src/db/workspace-schema.ts", { "./schema": core, "./customer-schema": customers });
   const notificationSchema = load("src/db/notification-schema.ts", { "./customer-schema": customers, "./workspace-schema": workspaceSchema });
-  const qualification = load("src/lib/qualification.ts", { "@/lib/countries": load("src/lib/countries.ts") });
+  const qualification = load("src/lib/qualification.ts", { ...commercial, "@/lib/countries": load("src/lib/countries.ts") });
   const workspace = load("src/lib/workspace.ts", { "@/lib/qualification": qualification });
   const db = drizzle(pg);
   let reads = 0;
@@ -28,7 +29,7 @@ test("transactional workspace email outbox", async (t) => {
   const env = { NEXT_PUBLIC_SITE_URL: "https://carriova.example.test", CONTACT_EMAIL: "team@example.test", SUPPORT_EMAIL: "support@example.test",
     email: { transactionalEnabled: true, transactionalFrom: "Carriova <noreply@example.test>", enabled: true, from: "legacy@example.test", baseUrl: "https://resend.example.test", apiKey: "test-only-key", notify: [] } };
   const renderer = await import("../src/lib/transactional-email.mjs");
-  const common = { "@/lib/transactional-email.mjs": renderer, "server-only": {}, "@/db": { getDb() { reads++; return db; } }, "@/db/customer-schema": customers,
+  const common = { ...commercial, "@/lib/transactional-email.mjs": renderer, "server-only": {}, "@/db": { getDb() { reads++; return db; } }, "@/db/customer-schema": customers,
     "@/db/workspace-schema": workspaceSchema, "@/db/notification-schema": notificationSchema, "@/lib/env": { serverEnv: env },
     "next/server": { after: (callback) => scheduled.push(callback) },
     "@/lib/staff-auth": { UnauthorizedError, requireStaff: async () => { if (!staffEnabled) throw new UnauthorizedError(); return { id: 3, name: "Staff", role: "advisor" }; } },

@@ -13,6 +13,8 @@ const staticPaths = [
   "/solutions/opportunites",
   "/solutions/matching",
   "/solutions/coaching",
+  "/solutions/linkedin",
+  "/solutions/entretien",
   "/solutions/expertise",
   "/emploi",
   "/a-propos",

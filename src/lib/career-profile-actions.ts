@@ -36,7 +36,7 @@ export async function saveCareerProfile(_previous: CareerProfileActionState, for
       else await tx.update(customerCareerProfiles).set({ content: profile, version: version + 1, updatedAt }).where(and(eq(customerCareerProfiles.customerId, customer.id), eq(customerCareerProfiles.version, version)));
       return { profile, version: version + 1, updatedAt: updatedAt.toISOString() };
     });
-    revalidatePath("/espace"); revalidatePath("/espace/profil"); revalidatePath("/espace/opportunites");
+    revalidatePath("/espace"); revalidatePath("/espace/profil"); revalidatePath("/espace/profil/modifier"); revalidatePath("/espace/opportunites");
     return { ok: true, message: "Votre profil professionnel est enregistré.", record };
   } catch (error) {
     if (error instanceof CustomerUnauthorizedError) redirect("/compte/connexion");

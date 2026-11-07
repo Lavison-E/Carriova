@@ -48,6 +48,7 @@ export async function submitQualification(_prev: ActionState, formData: FormData
       }).returning({ key: crmSubmissionLimits.key });
     if (!allowed) return { ok: false, message: "Trop de demandes. Merci de patienter dix minutes avant de réessayer." };
 
+    let workspaceRequestId: number | undefined;
     await db.transaction(async (tx) => {
       const [lead] = await tx.insert(leads).values({
         firstName: data.fullName,
@@ -66,7 +67,8 @@ export async function submitQualification(_prev: ActionState, formData: FormData
       }).returning({ id: leads.id });
       await tx.insert(qualifications).values({
         leadId: lead.id, country: data.country, profile: data.profile,
-        discoverySource: data.discoverySource, need: data.need, cvStatus: data.cvStatus,
+        discoverySource: data.discoverySource, need: data.need,
+        offerSnapshot: data.offerSnapshot, cvStatus: data.cvStatus,
         timeline: data.timeline, targetOffer: data.targetOffer, difficulty: data.difficulty,
         budget: data.budget, paymentReadiness: data.paymentReadiness,
         contactWhatsApp: data.contactWhatsApp === "yes",
@@ -79,13 +81,13 @@ export async function submitQualification(_prev: ActionState, formData: FormData
         leadId: lead.id, action: "qualification_submitted", status: "new",
         changes: { source: "/qualification", consentVersion: QUALIFICATION_CONSENT_VERSION },
       });
-      if (customer) await attachLeadToCustomer(tx, lead.id, customer);
+      if (customer) workspaceRequestId = await attachLeadToCustomer(tx, lead.id, customer);
       else if (claimToken) await tx.insert(customerLeadClaims).values({ tokenHash: customerTokenHash(claimToken), leadId: lead.id, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) });
     });
     if (claimToken) (await cookies()).set(CLAIM_COOKIE, claimToken, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 7 * 24 * 60 * 60 });
     // Seul le compte déjà authentifié reçoit les notifications de son espace ; aucun WhatsApp ni webhook CRM tiers.
     if (customer) scheduleWorkspaceNotifications({ customerId: customer.id });
-    return { ok: true, message: "Votre demande a bien été enregistrée. L’équipe CARRIOVA l’étudiera en respectant vos préférences de contact." };
+    return { ok: true, ...(workspaceRequestId ? { requestId: workspaceRequestId } : {}), message: "Votre demande a bien été enregistrée. L’équipe CARRIOVA l’étudiera en respectant vos préférences de contact." };
   } catch {
     return { ok: false, message: "Le service est temporairement indisponible. Votre demande n’a pas pu être enregistrée. Réessayez dans un instant." };
   }

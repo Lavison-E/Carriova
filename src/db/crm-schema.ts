@@ -1,6 +1,7 @@
 import { boolean, index, integer, jsonb, pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { leads } from "./schema";
 import type { CrmPriority, CrmStatus } from "@/lib/crm";
+import type { OfferSnapshot } from "@/lib/offer-selection";
 
 export const qualifications = pgTable("lead_qualifications", {
   leadId: integer("lead_id").primaryKey().references(() => leads.id),
@@ -8,6 +9,7 @@ export const qualifications = pgTable("lead_qualifications", {
   profile: varchar("profile", { length: 40 }).notNull(),
   discoverySource: varchar("discovery_source", { length: 40 }).notNull(),
   need: varchar("need", { length: 40 }).notNull(),
+  offerSnapshot: jsonb("offer_snapshot").$type<OfferSnapshot>(),
   cvStatus: varchar("cv_status", { length: 40 }).notNull(),
   timeline: varchar("timeline", { length: 40 }).notNull(),
   targetOffer: varchar("target_offer", { length: 40 }),

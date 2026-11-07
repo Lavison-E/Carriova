@@ -8,6 +8,7 @@ import { getDb } from "@/db";
 import { requestEvents, requestFiles, requestMessages, serviceRequests } from "@/db/workspace-schema";
 import { scheduleWorkspaceNotifications } from "@/lib/workspace-mail";
 import type { ActionState } from "@/lib/actions";
+import { selectOffer } from "@/lib/offer-selection";
 import { CustomerUnauthorizedError, requireCustomer } from "@/lib/customer-auth";
 import { requireStaff, UnauthorizedError } from "@/lib/staff-auth";
 import { validateWorkspaceFile, WorkspaceFileValidationError } from "@/lib/workspace-files";
@@ -87,14 +88,16 @@ export async function createServiceRequest(_prev: ActionState, fd: FormData): Pr
     const title = text(fd, "title");
     const service = text(fd, "service");
     const brief = text(fd, "brief");
+    const selectedOffer = selectOffer(fd.get("offer"), service);
     const fieldErrors: Record<string, string> = {};
+    if (selectedOffer.error) fieldErrors.offer = selectedOffer.error;
     if (title.length < 3 || title.length > 160) fieldErrors.title = "Indiquez un titre de 3 à 160 caractères.";
     if (!workspaceServiceOptions.some((option) => option.value === service)) fieldErrors.service = "Choisissez un service valide.";
     if (brief.length < 10 || brief.length > 10000) fieldErrors.brief = "Décrivez votre besoin en 10 à 10 000 caractères.";
     if (Object.keys(fieldErrors).length) return failure("Vérifiez les champs indiqués.", fieldErrors);
     const id = await getDb().transaction(async (tx) => {
       await customerQuota(tx, actor, "requests", 20, 86400, "Vous avez atteint la limite de 20 nouvelles demandes sur 24 heures. Patientez ou poursuivez vos demandes existantes.");
-      const [request] = await tx.insert(serviceRequests).values({ customerId: actor.id, title, service, brief }).returning({ id: serviceRequests.id });
+      const [request] = await tx.insert(serviceRequests).values({ customerId: actor.id, title, service, brief, offerSnapshot: selectedOffer.snapshot }).returning({ id: serviceRequests.id });
       await tx.insert(requestEvents).values({ requestId: request.id, type: "created", actorName: actor.name, body: "Votre demande a été reçue. L’équipe va l’étudier.", status: "received", createdAt: new Date() });
       return request.id;
     });
@@ -303,7 +306,7 @@ export async function customerRequestAction(_prev: ActionState, fd: FormData): P
       let body: string;
       if (action === "accept_quote" && current.status === "quoted" && current.quotedAmount !== null) {
         status = "in_progress";
-        body = "Le client a accepté la proposition. La prestation peut commencer ; aucun paiement n’est enregistré ici.";
+        body = "Le client a accepté la proposition. Le démarrage sera confirmé après le règlement prévu ; cette acceptation ne constitue pas un paiement.";
       } else if (action === "reject_quote" && current.status === "quoted") {
         status = "reviewing";
         body = "Le client a demandé un ajustement de la proposition. Une nouvelle proposition doit être validée avant la réalisation.";

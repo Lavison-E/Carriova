@@ -1,4 +1,5 @@
 "use server";
+import { normalizeCustomerReturnTo } from "@/lib/customer-navigation";
 import { randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -61,7 +62,7 @@ export async function customerSignup(_prev:ActionState,fd:FormData):Promise<Acti
   jar.set(CUSTOMER_COOKIE,token,cookieOptions());jar.set(CLAIM_COOKIE,"",{...cookieOptions(),maxAge:0});
  }catch{return unavailable;}
  scheduleWorkspaceNotifications();
- redirect("/espace");
+ redirect(normalizeCustomerReturnTo(value(fd,"returnTo")) ?? "/espace/profil?bienvenue=1");
 }
 export async function customerLogin(_prev:ActionState,fd:FormData):Promise<ActionState>{
  const email=value(fd,"email").trim().toLowerCase(),password=value(fd,"password");
@@ -83,7 +84,7 @@ export async function customerLogin(_prev:ActionState,fd:FormData):Promise<Actio
   jar.set(CUSTOMER_COOKIE,token,cookieOptions());jar.set(CLAIM_COOKIE,"",{...cookieOptions(),maxAge:0});
  }catch{return unavailable;}
  scheduleWorkspaceNotifications();
- redirect("/espace");
+ redirect(normalizeCustomerReturnTo(value(fd,"returnTo")) ?? "/espace");
 }
 export async function customerLogout(){
  const jar=await cookies(),token=jar.get(CUSTOMER_COOKIE)?.value;

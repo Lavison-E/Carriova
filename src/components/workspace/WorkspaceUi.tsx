@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import type { OfferSnapshot } from "@/lib/offer-selection";
 import { CareerIcon } from "@/components/brand/CareerIcon";
 import { workspaceStatusLabel, workspaceStages, workspaceStageIndex, type WorkspaceContext, type WorkspaceFile, type WorkspaceStatus } from "@/lib/workspace";
 
@@ -43,4 +44,10 @@ export function WorkspaceUnavailable({ href = "/espace" }: { href?: string }) {
 
 export function WorkspaceHeading({ eyebrow, title, text, back, action }: { eyebrow: string; title: string; text?: string; back?: string; action?: ReactNode }) {
   return <div className="mb-7 sm:mb-9">{back ? <Link href={back} className="mb-5 inline-flex min-h-9 items-center gap-2 text-xs font-medium text-muted hover:text-night"><CareerIcon name="arrow" className="h-3.5 w-3.5 rotate-180" />Retour aux demandes</Link> : null}<div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-orange">{eyebrow}</p><h1 className="mt-3 break-words font-editorial text-[2.35rem] italic leading-[1.1] tracking-tight text-night sm:text-[3.1rem]">{title}</h1>{text ? <p className="mt-4 max-w-2xl text-sm leading-7 text-muted">{text}</p> : null}</div>{action}</div></div>;
+}
+
+export function RequestOfferSummary({ offer }: { offer: OfferSnapshot | null }) {
+  if (!offer) return null;
+  const price = offer.priceMode === "quote" ? "Sur devis" : `${offer.priceMode === "from" ? "À partir de " : ""}${formatAmount(offer.priceAmount)}`;
+  return <section aria-label="Offre sélectionnée" className="my-6 rounded-xl border border-line bg-paper p-5 sm:p-6"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-orange">Votre offre sélectionnée</p><div className="mt-3 flex flex-wrap items-baseline justify-between gap-3"><h2 className="text-lg font-semibold text-night">{offer.name}</h2><p className="text-sm font-semibold text-night">{price}</p></div><p className="mt-2 text-xs leading-6 text-muted">{offer.delivery}</p><ul className="mt-3 space-y-1 text-xs leading-6 text-night">{offer.benefits.map(benefit => <li key={benefit}>• {benefit}</li>)}</ul><p className="mt-4 text-[10px] leading-6 text-muted">Offre et tarif du catalogue conservés lors de votre demande. La proposition de l’équipe et l’échéance confirmée figurent séparément dans votre suivi.</p></section>;
 }

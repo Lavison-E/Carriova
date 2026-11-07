@@ -17,6 +17,45 @@ export type SolutionPageContent = {
 };
 
 export const solutionPages: Record<string, SolutionPageContent> = {
+  linkedin: {
+    slug: "linkedin", eyebrow: "Profil LinkedIn",
+    title: "Un profil qui rend votre valeur visible.",
+    text: "Travaillez votre titre, votre présentation et vos expériences avec un conseiller. Une présence cohérente avec votre CV, votre métier et vos ambitions.",
+    primary: { href: "#formules", label: "Choisir ma formule LinkedIn" },
+    secondary: { href: "/qualification?need=linkedin", label: "Présenter mon objectif" },
+    problem: "Un profil peu renseigné ou un titre trop vague rendent votre expérience difficile à comprendre. Les recruteurs ont besoin de repères précis pour vous situer.",
+    value: "Nous préparons avec vous les textes et les mots-clés qui décrivent votre parcours réel. Vous recevez les contenus et les recommandations dans votre espace, puis les publiez sur votre propre compte LinkedIn.",
+    forWho: ["Professionnels en recherche de visibilité", "Candidats en mobilité", "Personnes qui repositionnent leur parcours"],
+    process: [
+      { title: "Votre positionnement", text: "Partagez le lien de votre profil, votre CV et les métiers visés." },
+      { title: "La formule adaptée", text: "Essentiel pour le titre et le résumé ; Complet pour retravailler aussi vos expériences et compétences." },
+      { title: "Des textes à votre image", text: "L’équipe prépare des contenus fondés sur vos expériences et vous les soumet dans votre espace." },
+      { title: "La mise à jour", text: "Vous validez les contenus et les ajoutez à LinkedIn. Vos identifiants restent personnels." },
+    ],
+    benefits: ["Un titre professionnel clair", "Un résumé qui donne du contexte à votre parcours", "Des mots-clés pertinents selon la formule", "Des conseils pour vos visuels et publications"],
+    deliverables: ["Textes prêts à intégrer à votre profil", "Recommandations de présentation", "Documents et échanges conservés dans votre espace"],
+    related: [{ href: "/solutions/cv", label: "Harmoniser mon CV" }, { href: "/tarifs", label: "Découvrir le pack Visibilité Professionnelle" }, { href: "/solutions/coaching", label: "Clarifier mon positionnement" }],
+  },
+  entretien: {
+    slug: "entretien", eyebrow: "Coaching entretien",
+    title: "Préparez vos réponses. Faites place à l’échange.",
+    text: "Un entretien se prépare à partir du poste, de l’entreprise et de vos expériences. Entraînez-vous avec un conseiller et repartez avec des axes concrets de progression.",
+    primary: { href: "#formules", label: "Choisir ma préparation" },
+    secondary: { href: "/qualification?need=interview", label: "Présenter mon entretien" },
+    problem: "Vous connaissez votre parcours, mais le présenter clairement sous pression demande de la préparation. Les exemples, le pitch et les questions au recruteur méritent un entraînement ciblé.",
+    value: "De la préparation Express à deux simulations intensives, le format suit votre besoin. L’équipe travaille vos réponses avec vous et fournit les retours prévus dans votre formule.",
+    forWho: ["Candidats avec un entretien programmé", "Jeunes diplômés", "Professionnels qui changent de poste", "Cadres préparant une négociation"],
+    process: [
+      { title: "Les informations utiles", text: "Transmettez l’offre, votre CV, la date de l’entretien et les points que vous souhaitez travailler." },
+      { title: "Le rendez-vous", text: "L’équipe confirme avec vous le format, le créneau et la modalité, en visio ou en présentiel." },
+      { title: "L’entraînement", text: "Vous préparez votre pitch et vos réponses à partir de situations vécues, sans inventer d’expérience." },
+      { title: "Les points à améliorer", text: "Vous repartez avec les retours de la séance et les supports inclus dans la formule choisie." },
+    ],
+    benefits: ["Un pitch structuré", "Des exemples concrets à présenter", "Un entraînement aux questions du poste", "Des questions pertinentes à poser au recruteur"],
+    deliverables: ["Séance ou simulations selon la formule", "Retour écrit pour Simulation complète et Préparation Intensive", "Supports prévus dans votre proposition"],
+    related: [{ href: "/solutions/matching", label: "Analyser l’offre et mon profil" }, { href: "/tarifs", label: "Voir le pack Objectif Recrutement" }, { href: "/solutions/coaching", label: "Travailler mon projet de carrière" }],
+  },
+
   cv: {
     slug: "cv", eyebrow: "CV professionnel",
     title: "Un CV qui donne du sens à votre parcours.",

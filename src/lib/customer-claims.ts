@@ -21,8 +21,9 @@ export async function attachLeadToCustomer(tx:Tx,leadId:number,user:CustomerIden
   "Budget envisagé : "+qualificationLabel("budget",q.budget),
   ...(row.lead.message?["Précisions : "+row.lead.message]:[]),
  ].join("\n");
- const [request]=await tx.insert(serviceRequests).values({customerId:user.id,leadId,title:qualificationLabel("need",q.need),service:q.need,brief}).onConflictDoNothing({target:serviceRequests.leadId}).returning({id:serviceRequests.id});
+ const [request]=await tx.insert(serviceRequests).values({customerId:user.id,leadId,title:q.offerSnapshot?.name ?? qualificationLabel("need",q.need),service:q.need,brief,offerSnapshot:q.offerSnapshot}).onConflictDoNothing({target:serviceRequests.leadId}).returning({id:serviceRequests.id});
  if(request)await tx.insert(requestEvents).values({requestId:request.id,type:"created",actorName:user.name,body:"Votre demande de qualification a été rattachée à votre espace.",status:"received"});
+ return request?.id;
 }
 export async function claimPendingLead(tx:Tx,token:string|undefined,user:CustomerIdentity){
  if(!token || !/^[A-Za-z0-9_-]{43}$/.test(token))return;

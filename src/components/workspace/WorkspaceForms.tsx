@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { OfferChoice } from "@/components/forms/OfferChoice";
+import { getPublishedOffer } from "@/lib/commercial-offers";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { ActionState } from "@/lib/actions";
@@ -32,15 +34,20 @@ function Field({ label, name, error, hint, children }: { label: string; name: st
   return <div><label htmlFor={id} className="text-xs font-semibold text-night">{label} <span aria-hidden="true" className="text-orange">*</span></label>{children({ id, name, "aria-invalid": error ? true : undefined, "aria-describedby": error ? `${id}-error` : hint ? `${id}-hint` : undefined })}{hint ? <p id={`${id}-hint`} className="mt-2 text-[11px] leading-6 text-muted">{hint}</p> : null}{error ? <p id={`${id}-error`} className="mt-2 text-xs leading-6 text-orange">{error}</p> : null}</div>;
 }
 
-export function NewRequestForm({ defaultService = "" }: { defaultService?: string }) {
+export function NewRequestForm({ defaultService = "", initialOffer = "" }: { defaultService?: string; initialOffer?: string }) {
+  const [offerSlug, setOfferSlug] = useState(initialOffer);
+  const selectedOffer = getPublishedOffer(offerSlug);
+  const [service, setService] = useState(getPublishedOffer(initialOffer)?.need ?? defaultService);
+  const [title, setTitle] = useState(getPublishedOffer(initialOffer)?.name ?? "");
   const submission = useSubmission(createServiceRequest);
   const { state, action, pending, revision } = submission;
   const router = useRouter();
   useEffect(() => { if (state.ok && state.requestId) router.push(`/espace/demandes/${state.requestId}`); }, [state, router]);
   return <div><Feedback submission={submission} />{state.ok && state.requestId ? <Link href={`/espace/demandes/${state.requestId}`} className={buttonStyle}>Ouvrir ma demande <CareerIcon name="arrow" className="h-4 w-4" /></Link> : <form key={revision} action={action} onReset={(event) => event.preventDefault()} aria-busy={pending}>
     <fieldset disabled={pending} className="min-w-0 space-y-6">
-      <Field name="service" label="Comment pouvons-nous vous accompagner ?" error={state.fieldErrors?.service}>{(props) => <select {...props} required defaultValue={defaultService} className={inputStyle}><option value="" disabled>Choisir un accompagnement</option>{workspaceServiceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>}</Field>
-      <Field name="title" label="Donnez un titre à votre demande" error={state.fieldErrors?.title} hint="Par exemple : adapter mon CV à un poste de responsable commercial.">{(props) => <input {...props} required minLength={3} maxLength={160} autoComplete="off" className={inputStyle} />}</Field>
+      <OfferChoice value={offerSlug} error={state.fieldErrors?.offer} disabled={pending} onChange={slug => { setOfferSlug(slug); const offer = getPublishedOffer(slug); if (offer) { setService(offer.need); setTitle(offer.name); } }} />
+      {selectedOffer ? <input type="hidden" name="service" value={selectedOffer.need} /> : <Field name="service" label="Comment pouvons-nous vous accompagner ?" error={state.fieldErrors?.service}>{(props) => <select {...props} required value={service} onChange={event => setService(event.target.value)} className={inputStyle}><option value="" disabled>Choisir un accompagnement</option>{workspaceServiceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>}</Field>}
+      <Field name="title" label="Donnez un titre à votre demande" error={state.fieldErrors?.title} hint="Par exemple : adapter mon CV à un poste de responsable commercial.">{(props) => <input {...props} required minLength={3} maxLength={160} value={title} onChange={event => setTitle(event.target.value)} autoComplete="off" className={inputStyle} />}</Field>
       <Field name="brief" label="Parlez-nous de votre objectif" error={state.fieldErrors?.brief} hint="Votre situation, le poste visé, vos attentes et vos délais : ces éléments nous aideront à vous proposer un accompagnement adapté.">{(props) => <textarea {...props} required minLength={10} maxLength={10000} rows={7} className={`${inputStyle} resize-y`} />}</Field>
     </fieldset>
     <div className="mt-7 flex flex-col gap-4 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between"><p className="max-w-xs text-[11px] leading-6 text-muted">Vous pourrez ajouter votre CV et vos documents juste après la création.</p><button type="submit" disabled={pending} className={`${buttonStyle} shrink-0`}>{pending ? "Envoi en cours…" : "Envoyer ma demande"}<CareerIcon name="arrow" className="h-4 w-4" /></button></div>

@@ -1,3 +1,4 @@
+const commercial = require("./helpers/commercial-fixture.cjs");
 const assert = require("node:assert/strict");
 const { createHash } = require("node:crypto");
 const { readFileSync } = require("node:fs");
@@ -28,7 +29,7 @@ test("private customer workspace PostgreSQL integration", async (t) => {
   const schema = loadTypeScript("src/db/schema.ts");
   const customerSchema = loadTypeScript("src/db/customer-schema.ts", { "./schema": schema });
   const workspaceSchema = loadTypeScript("src/db/workspace-schema.ts", { "./schema": schema, "./customer-schema": customerSchema });
-  const qualification = loadTypeScript("src/lib/qualification.ts", { "@/lib/countries": loadTypeScript("src/lib/countries.ts") });
+  const qualification = loadTypeScript("src/lib/qualification.ts", { ...commercial, "@/lib/countries": loadTypeScript("src/lib/countries.ts") });
   const workspace = loadTypeScript("src/lib/workspace.ts", { "@/lib/qualification": qualification });
   const db = drizzle(pg, { schema: { ...schema, ...customerSchema, ...workspaceSchema } });
   const customers = [
@@ -38,7 +39,7 @@ test("private customer workspace PostgreSQL integration", async (t) => {
   let activeCustomer = customers[0];
   let staffEnabled = false;
   let accesses = 0;
-  const common = {
+  const common = { ...commercial,
     "server-only": {}, "@/db": { getDb() { accesses++; return db; } },
     "@/db/schema": schema, "@/db/customer-schema": customerSchema, "@/db/workspace-schema": workspaceSchema,
     "@/lib/workspace": workspace,
@@ -92,6 +93,9 @@ test("private customer workspace PostgreSQL integration", async (t) => {
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261022_career_profile.sql"), "utf8"));
     await pg.exec(migration);
     await pg.exec(migration);
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_crm.sql"), "utf8"));
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261102_commercial_offers.sql"), "utf8"));
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261102_commercial_offers.sql"), "utf8"));
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_notifications.sql"), "utf8"));
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261022_workflow.sql"), "utf8"));
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261022_workflow.sql"), "utf8"));
@@ -119,8 +123,16 @@ test("private customer workspace PostgreSQL integration", async (t) => {
     assert.equal(accesses, before, "a logged-in customer still cannot access the publication action");
   });
 
+  await t.test("a forged offer or mismatched service cannot create a request", async () => {
+    for (const choice of [{ offer: "not-an-offer", service: "first_cv" }, { offer: "cv-cleaning", service: "executive" }]) {
+      const result = await actions.createServiceRequest(initial, form({ title: "Rejected offer", brief: "Ce choix doit être rejeté avant toute écriture.", ...choice }));
+      assert.equal(result.ok, false); assert.ok(result.fieldErrors.offer);
+    }
+    assert.equal((await pg.query("SELECT count(*)::int AS total FROM service_requests")).rows[0].total, 0);
+  });
+
   await t.test("request creation derives ownership from the session and commits its timeline atomically", async () => {
-    const result = await actions.createServiceRequest(initial, form({ title: "Améliorer mon CV", service: "improve_cv", brief: "Je souhaite valoriser mon expérience professionnelle.", customerId: "2", status: "completed", quoteAmountXOF: "0" }));
+    const result = await actions.createServiceRequest(initial, form({ title: "Améliorer mon CV", service: "improve_cv", brief: "Je souhaite valoriser mon expérience professionnelle.", customerId: "2", status: "completed", quoteAmountXOF: "0", offer: "cv-cleaning", priceAmount: "1", offerSnapshot: JSON.stringify({ priceAmount: 1 }) }));
     assert.equal(result.ok, true, result.message);
     requestId = result.requestId;
     assert.ok(Number.isSafeInteger(requestId));
@@ -133,6 +145,10 @@ test("private customer workspace PostgreSQL integration", async (t) => {
     staffEnabled = false;
     const own = await queries.getCustomerRequest(requestId);
     assert.equal(own.events.length, 1);
+    assert.equal(own.offerSnapshot.slug, "cv-cleaning");
+    assert.equal(own.offerSnapshot.priceAmount, 6000);
+    const storedOffer = (await pg.query("SELECT offer_snapshot FROM service_requests WHERE id=$1", [requestId])).rows[0];
+    assert.deepEqual(storedOffer.offer_snapshot, own.offerSnapshot);
     assert.equal(own.customerEmail, customers[0].email);
     assert.equal((await queries.getCustomerWorkspace()).stats.total, 1);
     assert.ok(invalidations.includes(`/espace/demandes/${requestId}`));

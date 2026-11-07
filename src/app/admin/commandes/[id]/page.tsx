@@ -1,8 +1,9 @@
+import { PaymentPanel } from "@/components/workspace/PaymentPanel";
 import { RefreshButton } from "@/components/workspace/RefreshButton";
 import { notFound, redirect } from "next/navigation";
 import { CrmShell } from "@/components/admin/CrmShell";
 import { DraftDeliveryRemoveButton, OrderConversation, OrderManager } from "@/components/admin/OrderManager";
-import { FileList, RequestProgress, RequestStatusBadge, formatAmount, formatWorkspaceDate } from "@/components/workspace/WorkspaceUi";
+import { FileList, RequestOfferSummary, RequestProgress, RequestStatusBadge, formatAmount, formatWorkspaceDate } from "@/components/workspace/WorkspaceUi";
 import { getStaffSession, UnauthorizedError, type StaffIdentity } from "@/lib/staff-auth";
 import { getTeamRequest } from "@/lib/workspace-queries";
 import { isWorkspaceFilePublished, workspaceServiceLabel, type WorkspaceRequestDetail } from "@/lib/workspace";
@@ -41,6 +42,8 @@ export default async function TeamOrderPage({ params }: { params: Promise<{ id: 
 
   return <CrmShell user={user} section="orders" action={<RefreshButton />} title={request.title} description={`Commande #${request.id} · ${workspaceServiceLabel(request.service)}`} back>
     <div className="mb-7 flex flex-wrap items-center justify-between gap-4"><RequestStatusBadge status={request.status} /><p className="text-xs leading-6 text-muted">Dernière activité : {formatWorkspaceDate(request.updatedAt, true)}</p></div>
+    <RequestOfferSummary offer={request.offerSnapshot} />
+    <PaymentPanel requestId={request.id} version={request.version} context="team" />
     <RequestProgress status={request.status} />
     <OrderManager key={request.id} request={{ id: request.id, version: request.version, status: request.status, quotedAmount: request.quotedAmount, dueAt: request.dueAt, reviewCount: reviews.length, unpublishedReviewCount: draftReviews.length, publishableReviewCount, briefCount: briefs.length, deliveryCount: deliveries.length, unpublishedCount: prepared.length, publishableCount }}>
         <section id="order-reviews" className="scroll-mt-6 rounded-xl border border-line bg-white p-5 sm:p-7" aria-labelledby="order-reviews-title">

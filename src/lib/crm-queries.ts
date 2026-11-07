@@ -111,6 +111,7 @@ export async function getCrmLead(id: number): Promise<CrmLeadDetail | null> {
     ...summary(row), message: row.message, consentPrivacy: row.consentPrivacy,
     consentMarketing: row.consentMarketing,
     qualification: qualification ? {
+      offerSnapshot: qualification.offerSnapshot,
       discoverySource: qualification.discoverySource, cvStatus: qualification.cvStatus,
       timeline: qualification.timeline, targetOffer: qualification.targetOffer,
       difficulty: qualification.difficulty, budget: qualification.budget,

@@ -1,13 +1,22 @@
 import Link from "next/link";
-import { qualificationRequestHref, serviceNeedForSlug, workspaceRequestHref } from "@/lib/service-catalog";
+import { formatOfferPrice, getPublishedOffer, offerRequestHref } from "@/lib/commercial-offers";
+import { getSolutionOffers, SolutionOffers } from "@/components/pricing/SolutionOffers";
 import { PageHero } from "@/components/layout/PageHero";
 import { ButtonLink, FaqList, JsonLd, Section } from "@/components/ui/primitives";
 import type { SolutionPageContent } from "@/lib/solution-content";
 import { breadcrumbJsonLd, faqJsonLd } from "@/lib/seo";
 import type { Faq } from "@/db/schema";
 
-export function SolutionView({ content, faqs }: { content: SolutionPageContent; faqs: Faq[] }) {
-  const requestNeed = serviceNeedForSlug(content.slug);
+export function SolutionView({ content, faqs = [] }: { content: SolutionPageContent; faqs?: Faq[] }) {
+  const offers = getSolutionOffers(content.slug);
+  const startingOffer = [...offers].sort((a, b) => (a.priceAmount ?? Infinity) - (b.priceAmount ?? Infinity))[0];
+  const cleaningOffer = getPublishedOffer("cv-cleaning");
+  const primary = offers.length && content.slug !== "opportunites" ? { href: "#formules", label: "Choisir mon accompagnement" } : content.primary;
+  const secondary = content.slug === "opportunites"
+    ? { href: "#formules", label: "Être accompagné dans ma recherche" }
+    : content.slug === "cv" && cleaningOffer
+      ? { href: offerRequestHref(cleaningOffer), label: `CV Cleaning · ${formatOfferPrice(cleaningOffer)}` }
+      : content.secondary;
   const displayedFaqs = faqs.map((faq) => faq.answer === "Via le formulaire de la page coaching. Nous confirmons un créneau selon les disponibilités."
     ? { ...faq, answer: "Présentez votre besoin dans le formulaire de qualification. L’équipe vous proposera un format et conviendra d’un créneau avec vous. Votre demande ne réserve pas automatiquement une séance." }
     : faq);
@@ -26,12 +35,14 @@ export function SolutionView({ content, faqs }: { content: SolutionPageContent; 
         eyebrow={content.eyebrow}
         title={content.title}
         text={content.text}
-        primary={content.primary}
-        secondary={content.secondary}
+        primary={primary}
+        secondary={secondary}
         crumbs={crumbs}
       >
-        {content.slug !== "opportunites" ? <div className="max-w-2xl rounded-lg border border-night/15 bg-white/60 px-4 py-3"><p className="text-xs leading-6 text-muted">Le contenu, le tarif et l’échéance sont précisés avant le démarrage de la prestation.</p><Link href={workspaceRequestHref(requestNeed)} className="mt-1 inline-flex min-h-9 items-center gap-2 text-xs font-semibold text-night underline decoration-night/25 underline-offset-4 hover:text-orange">Déjà connecté ? Créer cette demande dans mon espace <span aria-hidden="true">↗</span></Link></div> : null}
+        {startingOffer ? <div className="max-w-2xl rounded-lg border border-night/15 bg-white/60 px-4 py-3"><p className="text-xs leading-6 text-muted"><strong className="font-semibold text-night">{offers.length} formules à partir de {formatOfferPrice(startingOffer)}.</strong> Retrouvez ci-dessous le contenu, le délai et le prix de chaque accompagnement.</p><Link href="#formules" className="mt-1 inline-flex min-h-9 items-center gap-2 text-xs font-semibold text-night underline decoration-night/25 underline-offset-4 hover:text-orange">Comparer les formules <span aria-hidden="true">↓</span></Link></div> : null}
       </PageHero>
+
+      <SolutionOffers slug={content.slug} />
 
       {content.slug === "cv" ? <Section className="!py-8"><div className="flex flex-col gap-6 rounded-xl border border-night/15 bg-paper p-6 sm:p-8 md:flex-row md:items-center md:justify-between"><div className="max-w-xl"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">Le studio CV</p><h2 className="mt-3 text-2xl font-semibold tracking-tight text-night">Vous préférez le rédiger vous-même ?</h2><p className="mt-3 text-sm leading-7 text-muted">Créez et modifiez votre CV dans votre espace, choisissez une présentation et téléchargez votre PDF. L’accompagnement de l’équipe reste disponible si vous souhaitez être conseillé.</p></div><div className="shrink-0"><ButtonLink href="/espace/cv" variant="primary">Ouvrir le studio CV</ButtonLink><p className="mt-3 text-[10px] leading-6 text-muted">Connexion à votre espace requise.</p></div></div></Section> : null}
 
@@ -122,7 +133,7 @@ export function SolutionView({ content, faqs }: { content: SolutionPageContent; 
         <Section id="reserver">
           <div className="grid items-start gap-8 rounded-xl border border-line bg-paper p-6 sm:p-9 md:grid-cols-2 md:gap-12">
             <div><p className="text-[0.65rem] font-semibold uppercase tracking-[0.17em] text-orange">Choisir le bon échange</p><h2 className="mt-5 font-editorial text-4xl italic leading-tight text-night">Votre objectif guide<br />le format de la séance.</h2><p className="mt-5 text-sm leading-7 text-muted">Présentez votre besoin. Le rendez-vous sera confirmé avec l’équipe après définition de l’accompagnement et de son tarif.</p></div>
-            <div className="space-y-4"><ButtonLink href={qualificationRequestHref("career_growth")} variant="orange" className="w-full justify-between">Faire le point sur ma carrière <span aria-hidden="true">↗</span></ButtonLink><ButtonLink href={qualificationRequestHref("interview")} variant="secondary" className="w-full justify-between">Préparer un entretien <span aria-hidden="true">↗</span></ButtonLink><p className="text-xs leading-6 text-muted">Vous pourrez retrouver la proposition, les échanges et les supports partagés dans votre espace client.</p></div>
+            <div className="space-y-4"><ButtonLink href="#formules-carriere" variant="orange" className="w-full justify-between">Faire le point sur ma carrière <span aria-hidden="true">↗</span></ButtonLink><ButtonLink href="#formules-entretien" variant="secondary" className="w-full justify-between">Préparer un entretien <span aria-hidden="true">↗</span></ButtonLink><p className="text-xs leading-6 text-muted">Vous pourrez retrouver la proposition, les échanges et les supports partagés dans votre espace client.</p></div>
           </div>
         </Section>
       ) : null}
@@ -157,7 +168,7 @@ export function SolutionView({ content, faqs }: { content: SolutionPageContent; 
         <div className="mt-16 flex flex-col gap-7 border-t border-night/20 pt-10 lg:flex-row lg:items-center lg:justify-between">
           <p className="font-editorial text-4xl italic leading-tight text-night">Et si l’on commençait ?</p>
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <ButtonLink href={content.primary.href} variant="orange" size="lg">{content.primary.label}<span aria-hidden="true">↗</span></ButtonLink>
+            <ButtonLink href={primary.href} variant="orange" size="lg">{primary.label}<span aria-hidden="true">↗</span></ButtonLink>
             <ButtonLink href="/tarifs" variant="secondary" size="lg">Voir les offres</ButtonLink>
           </div>
         </div>

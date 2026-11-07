@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import { RequestOfferSummary } from "@/components/workspace/WorkspaceUi";
 import { CrmLeadEditor } from "@/components/admin/CrmLeadEditor";
 import { CrmShell, CrmStatusBadge, CrmUnavailable, formatCrmDate } from "@/components/admin/CrmShell";
 import { crmPriorityOptions, crmStatusOptions, type CrmHistoryItem, type CrmLeadDetail } from "@/lib/crm";
@@ -62,6 +63,7 @@ export default async function CrmLeadPage({ params }: { params: Promise<{ id: st
     <CrmShell user={user} title={lead.fullName} description={`Dossier #${lead.id} · Reçu le ${formatCrmDate(lead.createdAt)} · Dernière mise à jour le ${formatCrmDate(lead.updatedAt)}`} back>
       <div className="mb-7 flex flex-wrap items-center gap-3"><CrmStatusBadge status={lead.status} /><span className={`rounded-md border px-2.5 py-1 text-[11px] font-medium ${lead.priority === "high" ? "border-orange/25 bg-[#fff0e5] text-orange" : "border-line bg-white text-muted"}`}>Priorité {crmPriorityOptions.find((option) => option.value === lead.priority)?.label.toLocaleLowerCase("fr") ?? lead.priority}</span>{lead.followUpAt ? <span className={`text-xs ${overdue ? "font-medium text-orange" : "text-muted"}`}>{overdue ? "Relance en retard" : "Relance prévue"} · {formatCrmDate(lead.followUpAt)}</span> : null}</div>
 
+      <RequestOfferSummary offer={qualification?.offerSnapshot ?? null} />
       <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-7">
           <section className="rounded-xl border border-line bg-white p-5 sm:p-7" aria-labelledby="crm-profile-title">

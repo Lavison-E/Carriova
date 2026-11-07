@@ -1,3 +1,4 @@
+const commercial = require("./helpers/commercial-fixture.cjs");
 const assert = require("node:assert/strict");
 const { createHash } = require("node:crypto");
 const { readFileSync } = require("node:fs");
@@ -21,7 +22,7 @@ function load(file, mocks = {}) {
 const schema = load("src/db/schema.ts");
 const customerSchema = load("src/db/customer-schema.ts", { "./schema": schema });
 const crmSchema = load("src/db/crm-schema.ts", { "./schema": schema });
-const qualification = load("src/lib/qualification.ts", { "@/lib/countries": load("src/lib/countries.ts") });
+const qualification = load("src/lib/qualification.ts", { ...commercial, "@/lib/countries": load("src/lib/countries.ts") });
 const crm = load("src/lib/crm.ts");
 const initial = { ok: false, message: "" };
 class UnauthorizedError extends Error {}

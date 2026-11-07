@@ -1,3 +1,4 @@
+const commercial = require("./helpers/commercial-fixture.cjs");
 const assert = require("node:assert/strict");
 const { createHash } = require("node:crypto");
 const { readFileSync } = require("node:fs");
@@ -11,7 +12,7 @@ const { CORE_LEADS_SQL, loadTypeScript, migrationClient } = require("./helpers/c
 const schema = loadTypeScript("src/db/schema.ts");
 const customerSchema = loadTypeScript("src/db/customer-schema.ts", { "./schema": schema });
 const crmSchema = loadTypeScript("src/db/crm-schema.ts", { "./schema": schema });
-const qualification = loadTypeScript("src/lib/qualification.ts", { "@/lib/countries": loadTypeScript("src/lib/countries.ts") });
+const qualification = loadTypeScript("src/lib/qualification.ts", { ...commercial, "@/lib/countries": loadTypeScript("src/lib/countries.ts") });
 const crm = loadTypeScript("src/lib/crm.ts");
 const initial = { ok: false, message: "" };
 const staff = { id: 42, name: "Conseiller de test", email: "staff@example.test", role: "advisor" };
@@ -75,7 +76,7 @@ test("PostgreSQL CRM integration", async (t) => {
     await pg.exec(CORE_LEADS_SQL);
     const inserted = await pg.query("INSERT INTO leads(first_name,last_name,email,type,whatsapp,source) VALUES ('Ancien','Prospect','old@example.test','contact','+2250100000000','website') RETURNING id");
     legacyId = inserted.rows[0].id;
-    assert.deepEqual(await migrateCrm(client), ["20261018_staff.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261018_staff_invites.sql", "20261018_notifications.sql", "20261018_cv.sql", "20261022_workflow.sql", "20261022_career_profile.sql"]);
+    assert.deepEqual(await migrateCrm(client), ["20261018_staff.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261018_staff_invites.sql", "20261018_notifications.sql", "20261018_cv.sql", "20261022_workflow.sql", "20261022_career_profile.sql", "20261102_commercial_offers.sql", "20261102_payments.sql"]);
     assert.deepEqual(await migrateCrm(client), []);
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_crm.sql"), "utf8"));
     const { rows } = await pg.query("SELECT first_name,email FROM leads WHERE id=$1", [legacyId]);
@@ -92,7 +93,7 @@ test("PostgreSQL CRM integration", async (t) => {
   });
 
   await t.test("public submission commits all five records without fabricating email or contact consent", async () => {
-    const result = await submitQualification(initial, form({ consentMarketing: "on" }));
+    const result = await submitQualification(initial, form({ consentMarketing: "on", offer: "cv-cleaning", priceAmount: "1", offerSnapshot: JSON.stringify({ priceAmount: 1 }) }));
     assert.equal(result.ok, true, result.message);
     assert.deepEqual(Object.keys(result).sort(), ["message", "ok"]);
     const { rows } = await pg.query("SELECT l.id,l.email,l.consent_marketing,q.contact_whatsapp,q.source_form,q.consent_version,s.status,h.action FROM leads l JOIN lead_qualifications q ON q.lead_id=l.id JOIN crm_lead_state s ON s.lead_id=l.id JOIN crm_history h ON h.lead_id=l.id WHERE l.first_name='Qualification PostgreSQL'");
@@ -113,10 +114,23 @@ test("PostgreSQL CRM integration", async (t) => {
     const detail = await getCrmLead(qualifiedLeadId);
     assert.equal(detail.canContactWhatsApp, false);
     assert.equal(detail.qualification.contactWhatsApp, "no");
+    assert.equal(detail.qualification.offerSnapshot.slug, "cv-cleaning");
+    assert.equal(detail.qualification.offerSnapshot.priceAmount, 6000);
+    const frozen = (await pg.query("SELECT offer_snapshot FROM lead_qualifications WHERE lead_id=$1", [qualifiedLeadId])).rows[0];
+    assert.deepEqual(frozen.offer_snapshot, detail.qualification.offerSnapshot);
     assert.equal(detail.email, null);
     assert.ok(Number.isFinite(Date.parse(detail.createdAt)));
     assert.equal(detail.history.length, 1);
     assert.equal(detail.history[0].actorId, null);
+  });
+
+  await t.test("unknown or inconsistent selected offers never create a public lead", async () => {
+    const before = (await pg.query("SELECT count(*)::int AS total FROM leads")).rows[0].total;
+    for (const choice of [{ offer: "unknown-offer", need: "improve_cv" }, { offer: "executive", need: "improve_cv" }]) {
+      const result = await submitQualification(initial, form(choice));
+      assert.equal(result.ok, false); assert.ok(result.fieldErrors.offer);
+    }
+    assert.equal((await pg.query("SELECT count(*)::int AS total FROM leads")).rows[0].total, before);
   });
 
   await t.test("WhatsApp consent allows a manual contact link but never triggers external delivery", async (subtest) => {

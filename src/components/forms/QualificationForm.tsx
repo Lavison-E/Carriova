@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
+import { OfferChoice } from "@/components/forms/OfferChoice";
+import { getPublishedOffer } from "@/lib/commercial-offers";
 import { CareerIcon } from "@/components/brand/CareerIcon";
 import { ButtonLink, cn } from "@/components/ui/primitives";
 import type { ActionState } from "@/lib/actions";
@@ -15,7 +17,7 @@ const steps = [
     label: "Votre profil",
     title: "Faisons connaissance.",
     description: "Ces premières informations nous permettront de mieux comprendre votre profil.",
-    fields: ["fullName", "whatsapp", "country", "profile", "discoverySource"],
+    fields: ["offer", "fullName", "whatsapp", "country", "profile", "discoverySource"],
   },
   {
     label: "Votre besoin",
@@ -34,7 +36,7 @@ const steps = [
 const fieldLabels: Record<string, string> = {
   fullName: "Nom et prénom", whatsapp: "Numéro WhatsApp", country: "Pays de résidence",
   profile: "Situation professionnelle", discoverySource: "Découverte de Carriova",
-  need: "Besoin principal", cvStatus: "Votre CV", timeline: "Délai souhaité",
+  offer: "Offre Carriova", need: "Besoin principal", cvStatus: "Votre CV", timeline: "Délai souhaité",
   targetOffer: "Offre ciblée", difficulty: "Difficulté principale", budget: "Budget",
   paymentReadiness: "Votre intention", contactWhatsApp: "Contact sur WhatsApp",
   message: "Précision sur votre besoin", consentPrivacy: "Confidentialité", consentMarketing: "Communications Carriova",
@@ -90,11 +92,12 @@ function Choices({ name, title, number, value, onChange, error, required = true,
   );
 }
 
-export function QualificationForm({ initialNeed = null }: { initialNeed?: QualificationNeed | null }) {
+export function QualificationForm({ initialNeed = null, initialOffer = null }: { initialNeed?: QualificationNeed | null; initialOffer?: string | null }) {
   const [state, action, pending] = useActionState(submitQualification, initialState);
   const [lastResponse, setLastResponse] = useState(state);
   const [step, setStep] = useState(0);
-  const [values, setValues] = useState<Record<string, string>>((): Record<string, string> => initialNeed ? { need: initialNeed } : {});
+  const [values, setValues] = useState<Record<string, string>>(() => ({ need: getPublishedOffer(initialOffer)?.need ?? initialNeed ?? "", offer: initialOffer ?? "" }));
+  const selectedOffer = getPublishedOffer(values.offer);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showResponse, setShowResponse] = useState(false);
   const [focusRequest, setFocusRequest] = useState<{ target: "heading" | "error"; revision: number } | null>(null);
@@ -129,7 +132,7 @@ export function QualificationForm({ initialNeed = null }: { initialNeed?: Qualif
   }
 
   function updateValue(name: string, value: string) {
-    setValues((previous) => ({ ...previous, [name]: value }));
+    setValues((previous) => ({ ...previous, [name]: value, ...(name === "offer" && getPublishedOffer(value) ? { need: getPublishedOffer(value)!.need } : {}) }));
     setErrors((previous) => {
       if (!previous[name]) return previous;
       const next = { ...previous };
@@ -194,7 +197,7 @@ export function QualificationForm({ initialNeed = null }: { initialNeed?: Qualif
         <h2 ref={successRef} tabIndex={-1} className="mt-4 scroll-mt-28 text-3xl font-semibold tracking-tight text-night outline-none sm:text-4xl">Merci pour votre confiance !</h2>
         <p className="mt-5 max-w-xl text-base leading-8 text-muted">Votre demande a bien été reçue. L’équipe Carriova pourra étudier votre besoin et vous recontacter si vous avez demandé un échange.</p>
         <p className="mt-6 font-editorial text-2xl italic text-night">Révélez votre potentiel. Boostez votre carrière.</p>
-        <div className="mt-9 flex flex-col flex-wrap gap-3 sm:flex-row"><ButtonLink href="/compte/creer" variant="orange">Créer mon espace et suivre ma demande <CareerIcon name="arrow" className="h-4 w-4" /></ButtonLink><ButtonLink href="/" variant="secondary">Retour à l’accueil</ButtonLink></div>
+        <div className="mt-9 flex flex-col flex-wrap gap-3 sm:flex-row"><ButtonLink href={state.requestId ? `/espace/demandes/${state.requestId}` : "/compte/creer"} variant="orange">{state.requestId ? "Ouvrir ma demande dans mon espace" : "Créer mon espace et suivre ma demande"} <CareerIcon name="arrow" className="h-4 w-4" /></ButtonLink><ButtonLink href="/" variant="secondary">Retour à l’accueil</ButtonLink></div>
       </div>
     );
   }
@@ -237,6 +240,7 @@ export function QualificationForm({ initialNeed = null }: { initialNeed?: Qualif
         ) : null}
 
         <fieldset disabled={pending} className="min-w-0">
+          <OfferChoice value={values.offer ?? ""} onChange={value => updateValue("offer", value)} error={errors.offer} disabled={pending} />
           <div data-qualification-step hidden={step !== 0} className="space-y-7">
             <h3 className="qualification-no-js hidden text-xl font-semibold text-night">Étape 1 — Faisons connaissance</h3>
             <div className="grid gap-6 sm:grid-cols-2">
@@ -269,7 +273,7 @@ export function QualificationForm({ initialNeed = null }: { initialNeed?: Qualif
 
           <div data-qualification-step hidden={step !== 1} className="space-y-7">
             <h3 className="qualification-no-js hidden text-xl font-semibold text-night">Étape 2 — Comprenons votre besoin</h3>
-            <Choices name="need" number={6} title="Quel est votre principal besoin aujourd’hui ?" value={values.need ?? ""} onChange={updateValue} error={errors.need} />
+            {selectedOffer ? <div><input type="hidden" name="need" value={selectedOffer.need} /><p className="text-sm font-semibold text-night">Accompagnement choisi : {selectedOffer.name}</p><p className="mt-2 text-xs leading-6 text-muted">Pour changer d’accompagnement, modifiez ou retirez l’offre ci-dessus.</p></div> : <Choices name="need" number={6} title="Quel est votre principal besoin aujourd’hui ?" value={values.need ?? ""} onChange={updateValue} error={errors.need} />}
             <Choices name="cvStatus" number={7} title="Avez-vous déjà un CV à jour ?" value={values.cvStatus ?? ""} onChange={updateValue} error={errors.cvStatus} columns={1} />
             <Choices name="timeline" number={8} title="Quand souhaitez-vous obtenir de l’aide ?" value={values.timeline ?? ""} onChange={updateValue} error={errors.timeline} />
             <Choices name="targetOffer" number={9} title="Avez-vous déjà une offre d’emploi ciblée ?" value={values.targetOffer ?? ""} onChange={updateValue} error={errors.targetOffer} required={false} columns={1} />
