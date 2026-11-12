@@ -1,4 +1,5 @@
 import type { OfferSnapshot } from "@/lib/offer-selection";
+import type { WorkspaceFile, WorkspaceMessage, WorkspaceStatus } from "@/lib/workspace";
 
 export const crmStatusOptions = [
   { value: "new", label: "Nouveau" },
@@ -53,3 +54,14 @@ export type CrmDashboard = {
   leads: CrmLeadSummary[]; total: number; page: number; pageSize: number; totalPages: number;
   stats: { total: number; new: number; qualified: number; overdue: number };
 };
+
+/** Private client space linked to a prospect: the only channel for messages and documents. */
+export type CrmLeadWorkspace = {
+  request: null | {
+    id: number; title: string; status: WorkspaceStatus; customerName: string; customerEmail: string;
+    updatedAt: string; messages: WorkspaceMessage[]; files: WorkspaceFile[];
+  };
+  invitation: null | { expiresAt: string; active: boolean };
+  matchingAccounts: { id: number; name: string; email: string }[];
+};
+export type CrmInvitationState = { ok: boolean; message: string; invitationUrl?: string; expiresAt?: string };

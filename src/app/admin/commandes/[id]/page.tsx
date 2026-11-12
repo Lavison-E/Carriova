@@ -41,7 +41,7 @@ export default async function TeamOrderPage({ params }: { params: Promise<{ id: 
   const publishableReviewCount = draftReviews.filter((file) => !latestRevision || file.createdAt > latestRevision).length;
 
   return <CrmShell user={user} section="orders" action={<RefreshButton />} title={request.title} description={`Commande #${request.id} · ${workspaceServiceLabel(request.service)}`} back>
-    <div className="mb-7 flex flex-wrap items-center justify-between gap-4"><RequestStatusBadge status={request.status} /><p className="text-xs leading-6 text-muted">Dernière activité : {formatWorkspaceDate(request.updatedAt, true)}</p></div>
+    <div className="mb-7 flex flex-wrap items-center justify-between gap-4"><RequestStatusBadge status={request.status} /><div className="flex flex-wrap items-center gap-x-5 gap-y-2">{request.leadId ? <a href={`/admin/crm/${request.leadId}`} className="inline-flex min-h-9 items-center text-xs font-semibold text-night underline underline-offset-4 hover:text-orange">Fiche prospect #{request.leadId}</a> : null}<p className="text-xs leading-6 text-muted">Dernière activité : {formatWorkspaceDate(request.updatedAt, true)}</p></div></div>
     <RequestOfferSummary offer={request.offerSnapshot} />
     <PaymentPanel requestId={request.id} version={request.version} context="team" />
     <RequestProgress status={request.status} />

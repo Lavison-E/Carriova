@@ -64,6 +64,8 @@ function invalidate(id?: number) {
     scheduleWorkspaceNotifications({ requestId: id });
     revalidatePath(`/espace/demandes/${id}`);
     revalidatePath(`/admin/commandes/${id}`);
+    // Messages and documents are also handled from the prospect file.
+    revalidatePath("/admin/crm/[id]", "page");
   }
 }
 async function customerQuota(tx: Transaction, actor: Actor, scope: string, limit: number, seconds: number, explanation: string) {

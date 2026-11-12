@@ -1,11 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { RequestOfferSummary } from "@/components/workspace/WorkspaceUi";
+import { CrmClientSpace } from "@/components/admin/CrmClientSpace";
 import { CrmLeadEditor } from "@/components/admin/CrmLeadEditor";
 import { CrmShell, CrmStatusBadge, CrmUnavailable, formatCrmDate } from "@/components/admin/CrmShell";
-import { crmPriorityOptions, crmStatusOptions, type CrmHistoryItem, type CrmLeadDetail } from "@/lib/crm";
+import { crmPriorityOptions, crmStatusOptions, type CrmHistoryItem, type CrmLeadDetail, type CrmLeadWorkspace } from "@/lib/crm";
 import { getCrmLead } from "@/lib/crm-queries";
-import { qualificationLabel } from "@/lib/qualification";
+import { getCrmLeadWorkspace } from "@/lib/crm-workspace-queries";
+import { normalizeQualificationPhone, qualificationLabel } from "@/lib/qualification";
 import { getStaffSession, UnauthorizedError, type StaffIdentity } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +15,13 @@ export const metadata = { title: "Dossier prospect | CRM CARRIOVA", robots: { in
 
 async function getLeadSnapshot(id: number) {
   const lead = await getCrmLead(id);
-  return { lead, now: Date.now() };
+  let workspace: CrmLeadWorkspace | null = null;
+  if (lead) {
+    // The prospect file stays usable even if the client space cannot be loaded.
+    try { workspace = await getCrmLeadWorkspace(lead.id, lead.whatsapp); }
+    catch (error) { if (error instanceof UnauthorizedError) throw error; }
+  }
+  return { lead, workspace, now: Date.now() };
 }
 
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
@@ -23,6 +31,11 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 function statusLabel(value: string | null) {
   return crmStatusOptions.find((option) => option.value === value)?.label ?? value ?? "Non renseigné";
 }
+
+const historyTitles: Record<string, string> = {
+  qualification_submitted: "Demande reçue", updated_with_note: "Suivi et note enregistrés", updated: "Suivi mis à jour",
+  invitation_created: "Lien d’invitation créé", linked_to_customer: "Dossier rattaché à un espace client",
+};
 
 function historyChanges(item: CrmHistoryItem) {
   const lines: string[] = [];
@@ -37,6 +50,7 @@ function historyChanges(item: CrmHistoryItem) {
     }
     if (key === "followUpAt" && (typeof to === "string" || to === null)) lines.push(`Relance : ${to ? formatCrmDate(to) : "retirée"}`);
   }
+  if (item.action === "invitation_created" && typeof item.changes?.expiresAt === "string") lines.push(`Valable jusqu’au ${formatCrmDate(item.changes.expiresAt)}`);
   return lines;
 }
 
@@ -48,8 +62,9 @@ export default async function CrmLeadPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   if (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) notFound();
   let lead: CrmLeadDetail | null;
+  let workspace: CrmLeadWorkspace | null;
   let now: number;
-  try { ({ lead, now } = await getLeadSnapshot(Number(id))); }
+  try { ({ lead, workspace, now } = await getLeadSnapshot(Number(id))); }
   catch (error) {
     if (error instanceof UnauthorizedError) redirect("/admin/connexion");
     return <CrmShell user={user} title="Dossier prospect" back><CrmUnavailable retryHref={`/admin/crm/${id}`} /></CrmShell>;
@@ -61,11 +76,12 @@ export default async function CrmLeadPage({ params }: { params: Promise<{ id: st
 
   return (
     <CrmShell user={user} title={lead.fullName} description={`Dossier #${lead.id} · Reçu le ${formatCrmDate(lead.createdAt)} · Dernière mise à jour le ${formatCrmDate(lead.updatedAt)}`} back>
-      <div className="mb-7 flex flex-wrap items-center gap-3"><CrmStatusBadge status={lead.status} /><span className={`rounded-md border px-2.5 py-1 text-[11px] font-medium ${lead.priority === "high" ? "border-orange/25 bg-[#fff0e5] text-orange" : "border-line bg-white text-muted"}`}>Priorité {crmPriorityOptions.find((option) => option.value === lead.priority)?.label.toLocaleLowerCase("fr") ?? lead.priority}</span>{lead.followUpAt ? <span className={`text-xs ${overdue ? "font-medium text-orange" : "text-muted"}`}>{overdue ? "Relance en retard" : "Relance prévue"} · {formatCrmDate(lead.followUpAt)}</span> : null}</div>
+      <div className="mb-7 flex flex-wrap items-center gap-3"><CrmStatusBadge status={lead.status} /><span className={`rounded-md border px-2.5 py-1 text-[11px] font-medium ${lead.priority === "high" ? "border-orange/25 bg-[#fff0e5] text-orange" : "border-line bg-white text-muted"}`}>Priorité {crmPriorityOptions.find((option) => option.value === lead.priority)?.label.toLocaleLowerCase("fr") ?? lead.priority}</span>{lead.followUpAt ? <span className={`text-xs ${overdue ? "font-medium text-orange" : "text-muted"}`}>{overdue ? "Relance en retard" : "Relance prévue"} · {formatCrmDate(lead.followUpAt)}</span> : null}{workspace ? <a href="#crm-client-space" className={`ml-auto inline-flex min-h-9 items-center gap-2 rounded-md border px-3 text-[11px] font-semibold ${workspace.request ? "border-[#c4d6c8] bg-[#edf4ee] text-[#285236]" : "border-line bg-white text-night hover:border-night"}`}>{workspace.request ? `Espace client actif · ${workspace.request.messages.length} message${workspace.request.messages.length > 1 ? "s" : ""}` : "Inviter dans l’espace client"}<span aria-hidden="true">↓</span></a> : null}</div>
 
       <RequestOfferSummary offer={qualification?.offerSnapshot ?? null} />
       <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-7">
+          {workspace ? <CrmClientSpace key={`${lead.id}-${workspace.request?.id ?? "none"}`} leadId={lead.id} fullName={lead.fullName} canContactWhatsApp={lead.canContactWhatsApp} phone={normalizeQualificationPhone(lead.whatsapp ?? "")} workspace={workspace} /> : <section role="alert" className="rounded-xl border border-orange/30 bg-white p-5 sm:p-7"><h2 className="text-lg font-semibold tracking-tight">Les échanges avec le client n’ont pas pu être chargés.</h2><p className="mt-2 text-xs leading-6 text-muted">Les informations du prospect restent disponibles ci-dessous.</p><a href={`/admin/crm/${lead.id}`} className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-night px-5 text-sm font-semibold text-white">Réessayer</a></section>}
           <section className="rounded-xl border border-line bg-white p-5 sm:p-7" aria-labelledby="crm-profile-title">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">01 / Votre interlocuteur</p><h2 id="crm-profile-title" className="mt-3 text-xl font-semibold tracking-tight">Profil et coordonnées</h2>
             <dl className="mt-6 grid gap-x-7 gap-y-5 sm:grid-cols-2">
@@ -105,7 +121,7 @@ export default async function CrmLeadPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center justify-between gap-4"><h2 id="crm-history-title" className="text-xl font-semibold tracking-tight">Historique du suivi</h2><span className="text-xs text-muted">{lead.history.length} événement{lead.history.length > 1 ? "s" : ""}</span></div>
             {lead.history.length ? <ol className="mt-6 space-y-6">{lead.history.map((item) => {
               const changes = historyChanges(item);
-              return <li key={item.id} className="relative border-l border-line pl-5"><span className="absolute -left-[4px] top-2 h-[7px] w-[7px] rounded-full bg-orange" aria-hidden="true" /><div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><h3 className="text-sm font-semibold text-night">{item.action === "qualification_submitted" ? "Demande reçue" : item.action === "updated_with_note" ? "Suivi et note enregistrés" : "Suivi mis à jour"}</h3><time dateTime={item.createdAt} className="text-[10px] leading-6 text-muted">{formatCrmDate(item.createdAt)}</time></div><p className="mt-1 text-xs text-muted">{item.actorName || (item.action === "qualification_submitted" ? "Formulaire public" : "Système")}</p>{changes.length ? <ul className="mt-3 space-y-1 text-xs leading-6 text-muted">{changes.map((change) => <li key={change}>{change}</li>)}</ul> : null}{item.note ? <p className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-paper px-4 py-3 text-sm leading-7 text-night">{item.note}</p> : null}</li>;
+              return <li key={item.id} className="relative border-l border-line pl-5"><span className="absolute -left-[4px] top-2 h-[7px] w-[7px] rounded-full bg-orange" aria-hidden="true" /><div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1"><h3 className="text-sm font-semibold text-night">{historyTitles[item.action] ?? "Suivi mis à jour"}</h3><time dateTime={item.createdAt} className="text-[10px] leading-6 text-muted">{formatCrmDate(item.createdAt)}</time></div><p className="mt-1 text-xs text-muted">{item.actorName || (item.action === "qualification_submitted" ? "Formulaire public" : "Système")}</p>{changes.length ? <ul className="mt-3 space-y-1 text-xs leading-6 text-muted">{changes.map((change) => <li key={change}>{change}</li>)}</ul> : null}{item.note ? <p className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-paper px-4 py-3 text-sm leading-7 text-night">{item.note}</p> : null}</li>;
             })}</ol> : <p className="mt-4 text-sm leading-7 text-muted">Aucune action de suivi enregistrée. La première mise à jour apparaîtra ici.</p>}
           </section>
         </div>

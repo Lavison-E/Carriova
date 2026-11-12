@@ -59,7 +59,7 @@ export type WorkspaceFile = {
   uploadedByName: string; createdAt: string;
 };
 export type WorkspaceRequestDetail = WorkspaceRequestSummary & {
-  brief: string; messages: WorkspaceMessage[]; events: WorkspaceEvent[]; files: WorkspaceFile[];
+  brief: string; leadId: number | null; messages: WorkspaceMessage[]; events: WorkspaceEvent[]; files: WorkspaceFile[];
 };
 export type CustomerWorkspace = {
   requests: WorkspaceRequestSummary[];

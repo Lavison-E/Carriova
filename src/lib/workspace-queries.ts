@@ -69,7 +69,7 @@ async function getRequest(id: number, customerId?: number): Promise<WorkspaceReq
   if (!Number.isSafeInteger(id) || id < 1) return null;
   const db = getDb();
   const where = customerId === undefined ? eq(serviceRequests.id, id) : and(eq(serviceRequests.id, id), eq(serviceRequests.customerId, customerId));
-  const [row] = await db.select({ ...summaryColumns, brief: serviceRequests.brief }).from(serviceRequests)
+  const [row] = await db.select({ ...summaryColumns, brief: serviceRequests.brief, leadId: serviceRequests.leadId }).from(serviceRequests)
     .innerJoin(customerUsers, eq(customerUsers.id, serviceRequests.customerId)).where(where).limit(1);
   if (!row) return null;
   // Customer delivery files become visible only after an explicit delivery event.
@@ -85,7 +85,7 @@ async function getRequest(id: number, customerId?: number): Promise<WorkspaceReq
     db.select({ id: requestFiles.id, filename: requestFiles.filename, mimeType: requestFiles.mimeType, size: requestFiles.size, kind: requestFiles.kind, uploadedByName: requestFiles.uploadedByName, createdAt: requestFiles.createdAt })
       .from(requestFiles).where(and(eq(requestFiles.requestId, id), publishedFile)).orderBy(asc(requestFiles.createdAt), asc(requestFiles.id)),
   ]);
-  return { ...summary(row), brief: row.brief,
+  return { ...summary(row), brief: row.brief, leadId: customerId === undefined ? row.leadId : null,
     messages: messages.map((message) => ({ ...message, createdAt: message.createdAt.toISOString() })),
     events: events.map((event) => ({ ...event, createdAt: event.createdAt.toISOString() })),
     files: files.map((file) => ({ ...file, createdAt: file.createdAt.toISOString() })),
