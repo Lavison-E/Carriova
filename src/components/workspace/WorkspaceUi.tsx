@@ -39,7 +39,7 @@ export function FileList({ files, context = "customer", emptyText = "Aucun docum
 }
 
 export function WorkspaceUnavailable({ href = "/espace" }: { href?: string }) {
-  return <div role="alert" className="rounded-xl border border-line bg-white p-7 sm:p-10"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">Un instant, s’il vous plaît</p><h1 className="mt-4 text-2xl font-semibold tracking-tight text-night">Votre espace est temporairement indisponible.</h1><p className="mt-4 max-w-xl text-sm leading-7 text-muted">Nous n’avons pas pu charger vos informations. Vous pouvez réessayer dans un instant.</p><a href={href} className="mt-6 inline-flex min-h-11 items-center gap-5 rounded-lg bg-night px-5 text-sm font-semibold text-white">Réessayer <CareerIcon name="arrow" className="h-4 w-4" /></a></div>;
+  return <div role="alert" className="ws-card p-7 sm:p-10"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange">Un instant, s’il vous plaît</p><h1 className="mt-4 text-2xl font-semibold tracking-tight text-night">Votre espace est temporairement indisponible.</h1><p className="mt-4 max-w-xl text-sm leading-7 text-muted">Nous n’avons pas pu charger vos informations. Vous pouvez réessayer dans un instant.</p><a href={href} className="mt-6 inline-flex min-h-11 items-center gap-5 rounded-lg bg-night px-5 text-sm font-semibold text-white">Réessayer <CareerIcon name="arrow" className="h-4 w-4" /></a></div>;
 }
 
 export function WorkspaceHeading({ eyebrow, title, text, back, action }: { eyebrow: string; title: string; text?: string; back?: string; action?: ReactNode }) {

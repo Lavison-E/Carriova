@@ -47,7 +47,7 @@ export function PaymentPanel({ requestId, version = 0, context = "customer" }: {
   }
   const unconfirmedCheckout = summary?.payments.some(payment => ["creating", "pending", "processing"].includes(payment.status) && !payment.checkoutUrl);
   const reusableCheckout = summary?.payments.some(payment => payment.stage === summary.stage && ["pending", "processing"].includes(payment.status) && payment.checkoutUrl);
-  return <section id="paiement" aria-labelledby={`payment-heading-${requestId}`} aria-busy={busy} className="mb-6 rounded-xl border border-line bg-white p-5 sm:p-7">
+  return <section id="paiement" aria-labelledby={`payment-heading-${requestId}`} aria-busy={busy} className="mb-6 ws-card p-5 sm:p-7">
     <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-orange">Paiement sécurisé</p>
     <h2 id={`payment-heading-${requestId}`} className="mt-2 text-lg font-semibold text-night">{context === "team" ? "Encaissements de la demande" : "Votre règlement"}</h2>
     {error ? <p role="alert" className="mt-4 rounded-lg bg-red-50 p-4 text-xs leading-6 text-red-800">{error}</p> : null}
