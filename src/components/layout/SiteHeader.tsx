@@ -12,9 +12,10 @@ const mainLinks = [
   { href: "/emploi", label: "Emploi" },
   { href: "/solutions/coaching", label: "Coaching" },
   { href: "/ressources", label: "Ressources" },
+  { href: "/ebook/employable-indispensable", label: "Ebook", badge: "Nouveau" },
   { href: "/tarifs", label: "Tarifs" },
   { href: "/a-propos", label: "À propos" },
-] as const;
+] as const satisfies readonly { href: string; label: string; badge?: string }[];
 
 const solutionIcons: Record<string, CareerIconName> = {
   cv: "document",
@@ -150,6 +151,7 @@ function HeaderNavigation({ pathname }: { pathname: string }) {
               className={`inline-flex min-h-11 items-center whitespace-nowrap border-b text-[13px] font-medium transition-colors hover:text-white ${pathname === item.href ? "border-[#edab84] text-white" : "border-transparent text-white/75"}`}
             >
               {item.label}
+              {"badge" in item ? <span className="ml-2 rounded-full bg-orange px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white">{item.badge}</span> : null}
             </Link>
           ))}
         </nav>

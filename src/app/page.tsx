@@ -2,6 +2,7 @@ import { getPublishedJobs } from "@/lib/job-catalog";
 import Image from "next/image";
 import Link from "next/link";
 import { CareerIcon, type CareerIconName } from "@/components/brand/CareerIcon";
+import { EbookBand } from "@/components/ebook/EbookPromo";
 import { Badge, ButtonLink, Eyebrow, FaqList, JsonLd, Section } from "@/components/ui/primitives";
 import { getFaqs, getPublishedPosts } from "@/lib/queries";
 import { breadcrumbJsonLd, faqJsonLd } from "@/lib/seo";
@@ -126,6 +127,8 @@ export default async function HomePage() {
           {featuredJobs.length ? featuredJobs.map((job) => <Link key={job.slug} href={`/emploi/${job.slug}`} className="group flex flex-col gap-5 border-b border-line py-7 sm:flex-row sm:items-center"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-paper text-night"><CareerIcon name="briefcase" /></span><div className="flex-1"><h3 className="text-lg font-semibold text-night group-hover:text-orange">{job.title}</h3><p className="mt-2 text-sm text-muted">{job.company} <span className="mx-2" aria-hidden="true">·</span> {job.location}</p></div><div className="flex items-center justify-between gap-6"><Badge>{job.contractType}</Badge><CareerIcon name="arrow" className="h-5 w-5 text-night" /></div></Link>) : <div className="grid gap-6 border-b border-line py-9 sm:grid-cols-[3.5rem_1fr_auto] sm:items-center"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-paper text-orange"><CareerIcon name="briefcase" /></span><div><h3 className="text-lg font-semibold text-night">Votre prochaine opportunité se prépare.</h3><p className="mt-2 max-w-lg text-sm leading-7 text-muted">Aucune offre à afficher pour le moment. Faites de ce temps une longueur d’avance : préparez un CV prêt pour la suite.</p></div><Link href="/conseils-cv" className="text-link">Préparer mon CV <CareerIcon name="arrow" className="h-4 w-4" /></Link></div>}
         </div>
       </Section>
+
+      <EbookBand />
 
       <Section tone="paper">
         <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">

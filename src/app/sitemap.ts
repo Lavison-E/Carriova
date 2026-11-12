@@ -19,6 +19,7 @@ const staticPaths = [
   "/emploi",
   "/a-propos",
   "/ressources",
+  "/ebook/employable-indispensable",
   "/blog",
   "/guides",
   "/conseils-carriere",

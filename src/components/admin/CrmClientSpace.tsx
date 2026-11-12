@@ -5,6 +5,7 @@ import { CareerIcon } from "@/components/brand/CareerIcon";
 import { FileList, RequestStatusBadge, formatWorkspaceDate } from "@/components/workspace/WorkspaceUi";
 import type { ActionState } from "@/lib/actions";
 import type { CrmInvitationState, CrmLeadWorkspace } from "@/lib/crm";
+import { ebook, ebookCheckoutHref } from "@/lib/ebook";
 import { createCrmLeadInvitation, linkCrmLeadToCustomer } from "@/lib/crm-workspace-actions";
 import { addRequestMessage, uploadRequestFile } from "@/lib/workspace-actions";
 import { WORKSPACE_FILE_ACCEPT, WORKSPACE_MAX_FILE_BYTES, WORKSPACE_MAX_FILES } from "@/lib/workspace";
@@ -67,6 +68,7 @@ function Conversation({ request }: { request: LinkedRequest }) {
     `Bonjour ${firstName}, merci pour votre demande. Pouvez-vous nous transmettre votre CV actuel dans l’onglet Documents de votre espace ?`,
     `Bonjour ${firstName}, nous avons bien reçu votre document. Nous revenons vers vous très vite avec une proposition.`,
     `Bonjour ${firstName}, pouvez-vous nous préciser l’offre ou le poste visé, avec son lien si possible ?`,
+    `Bonjour ${firstName}, pour aller plus loin en parallèle de notre accompagnement, je vous recommande notre ebook « ${ebook.name} » : CV qui prouve votre valeur, entretiens avec la méthode STAR, plan 30-60-90 jours et 3 modèles de CV offerts. ${ebookCheckoutHref("equipe")}`,
   ];
   const [body, setBody] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
@@ -88,7 +90,7 @@ function Conversation({ request }: { request: LinkedRequest }) {
     <form ref={formRef} action={action} onReset={(event) => event.preventDefault()} aria-busy={pending} className="mt-5 space-y-3">
       <input type="hidden" name="context" value="team" /><input type="hidden" name="requestId" value={request.id} />
       <Feedback state={state} />
-      {!body ? <div className="flex flex-wrap gap-2" aria-label="Réponses rapides">{suggestions.map((suggestion, index) => <button key={suggestion} type="button" onClick={() => setBody(suggestion)} className="min-h-9 rounded-full border border-line bg-white px-3 text-[11px] text-night hover:border-night">{["Demander le CV", "Accuser réception", "Préciser l’offre visée"][index]}</button>)}</div> : null}
+      {!body ? <div className="flex flex-wrap gap-2" aria-label="Réponses rapides">{suggestions.map((suggestion, index) => <button key={suggestion} type="button" onClick={() => setBody(suggestion)} className="min-h-9 rounded-full border border-line bg-white px-3 text-[11px] text-night hover:border-night">{["Demander le CV", "Accuser réception", "Préciser l’offre visée", "Recommander l’ebook"][index]}</button>)}</div> : null}
       <label className="block text-xs font-semibold text-night"><span className="sr-only">Votre message au client</span><textarea name="body" required rows={4} maxLength={5000} disabled={pending} value={body} onChange={(event) => setBody(event.target.value)} onKeyDown={shortcut} aria-invalid={state.fieldErrors?.body ? true : undefined} aria-describedby="crm-message-help" placeholder={`Écrire à ${firstName}…`} className="w-full resize-y rounded-lg border border-line bg-white px-3 py-3 text-sm font-normal leading-7 text-night placeholder:text-muted/75 focus:border-night" /></label>
       <div className="flex flex-wrap items-center justify-between gap-3"><p id="crm-message-help" className="text-[11px] leading-5 text-muted">{state.fieldErrors?.body ?? "Visible par le client · Ctrl + Entrée pour envoyer"}</p><button type="submit" disabled={pending || !body.trim()} className="inline-flex min-h-12 items-center gap-6 rounded-lg bg-orange px-5 text-sm font-semibold text-white hover:bg-[#9e3708] disabled:cursor-not-allowed disabled:opacity-60">{pending ? "Envoi…" : "Envoyer au client"}<CareerIcon name="arrow" className="h-4 w-4" /></button></div>
     </form>

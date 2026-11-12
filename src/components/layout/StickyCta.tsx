@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ButtonLink } from "@/components/ui/primitives";
 import { CareerIcon } from "@/components/brand/CareerIcon";
+import { ebook, ebookCheckoutHref } from "@/lib/ebook";
 
 export function StickyCta() {
   const pathname = usePathname();
@@ -43,6 +44,13 @@ function ContextualStickyCta({ pathname }: { pathname: string }) {
 
   if (pathname.startsWith("/qualification") || pathname.startsWith("/compte") || pathname.startsWith("/contact") || pathname.startsWith("/support") || pathname.startsWith("/admin") || pathname.startsWith("/solutions")) return null;
   if (pathname === "/" && !heroPassed) return null;
+  if (pathname.startsWith("/ebook")) return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-night px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
+      <a href={ebookCheckoutHref("site")} target="_blank" rel="noopener" className="flex min-h-12 w-full items-center justify-between rounded-lg bg-orange px-5 text-sm font-semibold text-white">
+        <span>Obtenir l’ebook · {ebook.price}</span><CareerIcon name="arrow" className="h-4 w-4" />
+      </a>
+    </div>
+  );
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-night/15 bg-[#f7f5ef] px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">

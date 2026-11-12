@@ -358,6 +358,7 @@ export const footerGroups = [
   {
     title: "Ressources",
     links: [
+      { href: "/ebook/employable-indispensable", label: "Ebook Employable & Indispensable" },
       { href: "/blog", label: "Blog" },
       { href: "/guides", label: "Guides" },
       { href: "/conseils-carriere", label: "Conseils carrière" },

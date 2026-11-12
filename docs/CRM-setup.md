@@ -114,3 +114,17 @@ Les nouveaux comptes clients reçoivent un message de bienvenue. Les demandes, p
 
 Les notifications sont placées dans une file PostgreSQL pendant la même transaction que l’événement. L’envoi s’effectue après son enregistrement : une panne de Resend n’annule pas la demande du client. Les membres de l’équipe peuvent consulter l’état et relancer les envois depuis `/admin/notifications`. Un état accepté par Resend ne prouve pas la lecture par le destinataire. Le lien d’activation de l’équipe et la récupération du mot de passe suivent leurs propres règles d’expiration et ne sont pas inclus dans cette file de suivi des demandes.
 Les reprises automatiques s’arrêtent après 23 heures lorsqu’un résultat reste incertain, car la protection d’idempotence du prestataire est limitée dans le temps. L’équipe doit vérifier l’envoi dans Resend avant une relance manuelle tardive, afin d’éviter un doublon.
+
+## Échanges depuis la fiche prospect
+
+La fiche `/admin/crm/[id]` regroupe désormais les échanges avec le client :
+
+- **Dossier rattaché à un espace client** : onglets *Messages* (fil, réponses rapides, Ctrl + Entrée) et *Documents* (partage immédiat d’un PDF, DOCX, JPG ou PNG de 3 Mo maximum). Les versions à valider et les livraisons finales restent dans la commande complète, accessible depuis la fiche. La commande renvoie aussi vers sa fiche prospect.
+- **Prospect sans compte** (cas du questionnaire, qui ne demande pas d’e-mail) : l’équipe crée un lien d’invitation personnel, valable 7 jours et utilisable une seule fois. Il ouvre `/compte/invitation`, puis la création de compte ou la connexion ; la demande est alors ajoutée à l’espace du client. Un nouveau lien désactive le précédent. Le bouton WhatsApp n’apparaît que si le prospect a accepté un échange individuel.
+- **Compte existant avec le même numéro WhatsApp** : la fiche le propose ; le rattachement demande une confirmation et n’accepte qu’un compte actif dont le numéro correspond exactement.
+
+Chaque invitation et chaque rattachement est inscrit dans l’historique du suivi. Aucune migration n’est nécessaire.
+
+## Ebook « Employable & Indispensable »
+
+Le produit est décrit dans `src/lib/ebook.ts` (prix, contenus, lien Chariow) : modifiez ce fichier pour mettre à jour toutes les pages. Il apparaît sur `/ebook/employable-indispensable`, sur l’accueil, dans les ressources, l’en-tête et le pied de page, dans l’espace client (`/espace` et `/espace/bibliotheque`) et dans les réponses rapides de l’équipe. Le paiement et la livraison du PDF se font sur Chariow ; les liens portent `utm_source=carriova` et `utm_medium` = `site`, `espace` ou `equipe` pour suivre l’origine des ventes.

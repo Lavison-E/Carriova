@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ResourceLeadForm } from "@/components/forms/LeadForms";
 import { PageHero } from "@/components/layout/PageHero";
+import { EbookBand } from "@/components/ebook/EbookPromo";
 import { JsonLd, Section } from "@/components/ui/primitives";
 import { breadcrumbJsonLd, buildMetadata } from "@/lib/seo";
 import { editorialPosts } from "@/lib/editorial";
@@ -36,6 +37,7 @@ export default function ResourcesPage() {
         text="Les bonnes questions, des conseils pratiques et le temps de faire le point. Retrouvez ici de quoi préparer votre prochain pas professionnel."
         crumbs={crumbs}
       />
+      <EbookBand />
       <Section className="pb-0 md:pb-0">
         <article className="grid gap-8 border-b border-night/20 pb-12 md:grid-cols-12 md:gap-12">
           <div className="md:col-span-3">

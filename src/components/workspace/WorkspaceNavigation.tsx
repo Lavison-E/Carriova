@@ -11,6 +11,7 @@ const links: { href: string; label: string; short: string; icon: CareerIconName 
   { href: "/espace/cv", label: "Mes CV", short: "Mes CV", icon: "letter" },
   { href: "/espace/demandes", label: "Mes demandes", short: "Demandes", icon: "briefcase" },
   { href: "/espace/documents", label: "Produits & documents", short: "Produits", icon: "document" },
+  { href: "/espace/bibliotheque", label: "Bibliothèque premium", short: "Bibliothèque", icon: "check" },
   { href: "/espace/compte", label: "Mon compte", short: "Compte", icon: "people" },
 ];
 export function WorkspaceNavigation({ mobile = false }: { mobile?: boolean }) {
