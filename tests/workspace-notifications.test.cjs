@@ -13,7 +13,7 @@ class CustomerUnauthorizedError extends Error {}
 test("transactional workspace email outbox", async (t) => {
   const pg = new PGlite(); await pg.waitReady; t.after(() => pg.close());
   await pg.exec(CORE_LEADS_SQL);
-  for (const name of ["20261018_staff.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261102_commercial_offers.sql"]) await pg.exec(readFileSync(resolve(__dirname, "../migrations", name), "utf8"));
+  for (const name of ["20261018_staff.sql", "20261107_team_management.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261102_commercial_offers.sql"]) await pg.exec(readFileSync(resolve(__dirname, "../migrations", name), "utf8"));
   await pg.exec("INSERT INTO customer_users(id,email,name,password_hash,consent_privacy,consent_version) VALUES(1,'old@example.test','Old private name','hash',true,'test')");
   const migration = readFileSync(resolve(__dirname, "../migrations/20261018_notifications.sql"), "utf8");
   const core = load("src/db/schema.ts");

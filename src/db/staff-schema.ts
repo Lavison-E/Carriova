@@ -7,6 +7,8 @@ export const staffUsers = pgTable("staff_users", {
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   role: varchar("role", { length: 20 }).notNull().default("advisor"),
   enabled: boolean("enabled").notNull().default(true),
+  version: integer("version").notNull().default(1),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 export const staffSessions = pgTable("staff_sessions", {

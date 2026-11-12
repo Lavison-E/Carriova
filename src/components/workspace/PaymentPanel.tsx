@@ -12,7 +12,7 @@ async function paymentResponse(response: Response) {
 export function PaymentPanel({ requestId, version = 0, context = "customer" }: { requestId: number; version?: number; context?: "customer" | "team" }) {
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const endpoint = context === "team" ? "/api/payments/geniuspay/admin" : "/api/payments/geniuspay";
+  const endpoint = context === "team" ? "/admin/api/payments/geniuspay" : "/api/payments/geniuspay";
   useEffect(() => {
     let active = true;
     async function load() {

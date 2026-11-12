@@ -36,16 +36,22 @@ export async function staffLogin(_previous: ActionState, data: FormData): Promis
       return { ok: false, message: "Trop de tentatives. Patientez quinze minutes avant de réessayer." };
     const [user] = await getDb().select().from(staffUsers).where(eq(staffUsers.email, email)).limit(1);
     const valid = await verifyPassword(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
-    if (!valid || !user || !user.enabled || !["admin", "advisor"].includes(user.role)) return invalid;
+    if (!valid || !user || !user.enabled || user.deletedAt || !["admin", "advisor"].includes(user.role)) return invalid;
     const token = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000);
     const jar = await cookies();
     const previous = jar.get(STAFF_COOKIE)?.value;
-    await getDb().transaction(async (tx) => {
+    const created = await getDb().transaction(async (tx) => {
+      // Account changes and sign-in serialize on the same user row.
+      const [current] = await tx.select().from(staffUsers).where(eq(staffUsers.id, user.id)).for("update");
+      if (!current || !current.enabled || current.deletedAt || !["admin", "advisor"].includes(current.role)
+        || current.passwordHash !== user.passwordHash || current.version !== user.version) return false;
       if (previous) await tx.delete(staffSessions).where(eq(staffSessions.tokenHash, tokenHash(previous)));
       await tx.delete(staffSessions).where(sql`${staffSessions.expiresAt} <= now()`);
       await tx.insert(staffSessions).values({ tokenHash: tokenHash(token), userId: user.id, expiresAt });
+      return true;
     });
+    if (!created) return invalid;
     jar.set(STAFF_COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/admin", maxAge: SESSION_SECONDS, expires: expiresAt });
   } catch {
     console.error("[staff-auth] sign-in unavailable");

@@ -11,7 +11,7 @@ const fd = values => { const data = new FormData(); for (const [key, value] of O
 
  test("Staff invitations activate only the invited account with its operator-selected role", async t => {
   const pg = new PGlite(); t.after(() => pg.close());
-  for (const file of ["20261018_staff.sql", "20261018_staff_invites.sql"]) await pg.exec(readFileSync(resolve(__dirname, "../migrations", file), "utf8"));
+  for (const file of ["20261018_staff.sql", "20261107_team_management.sql", "20261018_staff_invites.sql"]) await pg.exec(readFileSync(resolve(__dirname, "../migrations", file), "utf8"));
   const client = migrationClient(pg), db = drizzle(pg);
   const { issueStaffInvitation, invitationMailConfig, sendStaffInvitation } = await import("../scripts/staff-invite.mjs");
   const passwords = await import("../src/lib/staff-password.mjs");

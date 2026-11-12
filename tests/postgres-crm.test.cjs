@@ -76,7 +76,7 @@ test("PostgreSQL CRM integration", async (t) => {
     await pg.exec(CORE_LEADS_SQL);
     const inserted = await pg.query("INSERT INTO leads(first_name,last_name,email,type,whatsapp,source) VALUES ('Ancien','Prospect','old@example.test','contact','+2250100000000','website') RETURNING id");
     legacyId = inserted.rows[0].id;
-    assert.deepEqual(await migrateCrm(client), ["20261018_staff.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261018_staff_invites.sql", "20261018_notifications.sql", "20261018_cv.sql", "20261022_workflow.sql", "20261022_career_profile.sql", "20261102_commercial_offers.sql", "20261102_payments.sql"]);
+    assert.deepEqual(await migrateCrm(client), ["20261018_staff.sql", "20261018_crm.sql", "20261018_customer.sql", "20261018_workspace.sql", "20261018_staff_invites.sql", "20261018_notifications.sql", "20261018_cv.sql", "20261022_workflow.sql", "20261022_career_profile.sql", "20261102_commercial_offers.sql", "20261102_payments.sql", "20261107_team_management.sql"]);
     assert.deepEqual(await migrateCrm(client), []);
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_crm.sql"), "utf8"));
     const { rows } = await pg.query("SELECT first_name,email FROM leads WHERE id=$1", [legacyId]);

@@ -40,12 +40,12 @@ export async function activateStaffInvitation(_previous: ActionState, data: Form
       if (!candidate) return false;
       // All invitation operations lock the staff user before its invitation or sessions.
       const [user] = await tx.select().from(staffUsers).where(eq(staffUsers.id, candidate.userId)).for("update");
-      if (!user || user.enabled || !["admin", "advisor"].includes(user.role)) return false;
+      if (!user || user.deletedAt || user.enabled || !["admin", "advisor"].includes(user.role)) return false;
       const [invitation] = await tx.select({ tokenHash: staffInvites.tokenHash }).from(staffInvites)
         .where(and(eq(staffInvites.tokenHash, hashedToken), eq(staffInvites.userId, user.id), gt(staffInvites.expiresAt, new Date()))).for("update");
       if (!invitation) return false;
       const passwordHash = await hashPassword(password);
-      await tx.update(staffUsers).set({ passwordHash, enabled: true }).where(eq(staffUsers.id, user.id));
+      await tx.update(staffUsers).set({ passwordHash, enabled: true, version: user.version + 1 }).where(eq(staffUsers.id, user.id));
       await tx.delete(staffInvites).where(eq(staffInvites.userId, user.id));
       await tx.delete(staffSessions).where(eq(staffSessions.userId, user.id));
       return true;

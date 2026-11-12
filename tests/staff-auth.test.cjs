@@ -28,6 +28,7 @@ test("Staff authentication uses persistent, revocable and expiring sessions", as
   const pg = new PGlite();
   t.after(() => pg.close());
   await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_staff.sql"), "utf8"));
+  await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261107_team_management.sql"), "utf8"));
   const db = drizzle(pg);
   const schema = load("src/db/staff-schema.ts");
   const cookieValues = new Map();
@@ -44,8 +45,13 @@ test("Staff authentication uses persistent, revocable and expiring sessions", as
   };
   const auth = load("src/lib/staff-auth.ts", common);
   class Redirect extends Error { constructor(path) { super(path); this.path = path; } }
+  let afterPasswordCheck;
   const actions = load("src/lib/staff-actions.ts", {
-    ...common, "@/lib/staff-auth": auth, "@/lib/staff-password.mjs": passwords,
+    ...common, "@/lib/staff-auth": auth, "@/lib/staff-password.mjs": { ...passwords, async verifyPassword(...args) {
+      const valid = await passwords.verifyPassword(...args);
+      if (afterPasswordCheck) await afterPasswordCheck();
+      return valid;
+    } },
     "@/lib/security": load("src/lib/security.ts"),
     "next/navigation": { redirect(path) { throw new Redirect(path); } },
   });
@@ -99,6 +105,24 @@ test("Staff authentication uses persistent, revocable and expiring sessions", as
     const wrong = await login("advisor@example.test", "wrong");
     assert.deepEqual(unknown, wrong);
     assert.equal(unknown.ok, false);
+  });
+  await t.test("a concurrent access change prevents a login from creating a new session", async () => {
+    await pg.query("DELETE FROM staff_login_attempts");
+    afterPasswordCheck = async () => { await pg.query("UPDATE staff_users SET version=version+1 WHERE id=1"); };
+    try {
+      assert.equal((await login("advisor@example.test")).ok, false);
+      assert.equal((await pg.query("SELECT count(*)::int AS count FROM staff_sessions")).rows[0].count, 0);
+      assert.equal(await auth.getStaffSession(), null);
+    } finally { afterPasswordCheck = undefined; }
+  });
+  await t.test("a deleted member cannot log in or reuse a session", async () => {
+    await pg.query("DELETE FROM staff_login_attempts");
+    await assert.rejects(login("advisor@example.test"), Redirect);
+    await pg.query("UPDATE staff_users SET enabled=false, deleted_at=now() WHERE id=1");
+    assert.equal(await auth.getStaffSession(), null);
+    assert.equal((await login("advisor@example.test")).ok, false);
+    await pg.query("DELETE FROM staff_sessions");
+    await pg.query("UPDATE staff_users SET enabled=true, deleted_at=null WHERE id=1");
   });
   await t.test("persistent attempt limit stops brute force before password verification", async () => {
     await pg.query("INSERT INTO staff_login_attempts(key,attempts,reset_at) VALUES($1,8,now()+interval '15 minutes') ON CONFLICT(key) DO UPDATE SET attempts=8,reset_at=excluded.reset_at", [auth.tokenHash("email:advisor@example.test")]);

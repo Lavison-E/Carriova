@@ -89,6 +89,7 @@ test("private customer workspace PostgreSQL integration", async (t) => {
     await assert.rejects(pg.exec(migration), /customer_users/);
     await pg.exec(CORE_LEADS_SQL);
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_staff.sql"), "utf8"));
+    await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261107_team_management.sql"), "utf8"));
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261018_customer.sql"), "utf8"));
     await pg.exec(readFileSync(resolve(__dirname, "../migrations/20261022_career_profile.sql"), "utf8"));
     await pg.exec(migration);

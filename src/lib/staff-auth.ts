@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
-import { and, eq, gt, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 import { databaseConfigured, getDb } from "@/db";
 import { staffSessions, staffUsers } from "@/db/staff-schema";
 
@@ -21,7 +21,7 @@ export async function getStaffSession(): Promise<StaffIdentity | null> {
   const [row] = await getDb().select({ id: staffUsers.id, email: staffUsers.email, name: staffUsers.name, role: staffUsers.role })
     .from(staffSessions).innerJoin(staffUsers, eq(staffUsers.id, staffSessions.userId))
     .where(and(eq(staffSessions.tokenHash, tokenHash(token)), gt(staffSessions.expiresAt, new Date()),
-      eq(staffUsers.enabled, true), inArray(staffUsers.role, ["admin", "advisor"]))).limit(1);
+      eq(staffUsers.enabled, true), isNull(staffUsers.deletedAt), inArray(staffUsers.role, ["admin", "advisor"]))).limit(1);
   return row ? { ...row, role: row.role as StaffIdentity["role"] } : null;
 }
 export async function requireStaff(): Promise<StaffIdentity> {
