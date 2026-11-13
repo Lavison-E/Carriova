@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PaymentPanel } from "@/components/workspace/PaymentPanel";
 import { RefreshButton } from "@/components/workspace/RefreshButton";
 import type { Metadata } from "next";
@@ -23,6 +24,13 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const reviews = request.files.filter(file => file.kind === "review").reverse();
   const documents = request.files.filter((file) => file.kind === "brief");
   const closed = ["completed", "cancelled"].includes(request.status);
+  // A Premium pass is a subscription payment, not a service delivery: show only what matters.
+  if (request.service === "premium_pass") return <>
+    <WorkspaceHeading action={<RefreshButton />} eyebrow="Pass Premium · 30 jours" title={request.status === "completed" ? "Votre Premium est actif" : "Activez votre Premium"} back="/espace/premium" />
+    <div className="mb-6 flex flex-col gap-4 rounded-[1.25rem] bg-night p-5 text-white sm:flex-row sm:items-center sm:justify-between sm:p-6"><p className="text-sm leading-6 text-white/85">{request.status === "completed" ? "Votre paiement est confirmé. Retrouvez vos offres ciblées et préparez vos candidatures." : "Réglez 2 000 FCFA ci-dessous : votre Premium s’active automatiquement dès la confirmation du paiement, pour 30 jours."}</p><Link href="/espace/premium" className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-orange px-5 text-xs font-semibold">{request.status === "completed" ? "Ouvrir Premium" : "Revoir l’offre"}<span aria-hidden="true">→</span></Link></div>
+    <PaymentPanel requestId={request.id} version={request.version} />
+    <p className="text-[11px] leading-6 text-muted">Sans engagement ni prélèvement automatique : à la fin des 30 jours, vous choisissez de renouveler ou non. Un renouvellement anticipé s’ajoute aux jours restants.</p>
+  </>;
   return <>
     <WorkspaceHeading action={<RefreshButton />} eyebrow={`Demande ${String(id).padStart(3, "0")} · ${workspaceServiceLabel(request.service)}`} title={request.title} back="/espace/demandes" />
     <RequestOfferSummary offer={request.offerSnapshot} />

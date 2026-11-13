@@ -9,6 +9,7 @@ const links: { href: string; label: string; short: string; icon: CareerIconName;
   { href: "/espace/profil", label: "Mon profil", short: "Profil", icon: "user", group: "Mon parcours" },
   { href: "/espace/opportunites", label: "Mes opportunités", short: "Opportunités", icon: "target", group: "Mon parcours" },
   { href: "/espace/cv", label: "Mes CV", short: "Mes CV", icon: "letter", group: "Mon parcours" },
+  { href: "/espace/premium", label: "Premium", short: "Premium", icon: "spark", group: "Mes services", badge: "Pro" },
   { href: "/espace/demandes", label: "Mes demandes", short: "Demandes", icon: "briefcase", group: "Mes services" },
   { href: "/espace/documents", label: "Produits & documents", short: "Produits", icon: "document", group: "Mes services" },
   { href: "/espace/bibliotheque", label: "Bibliothèque", short: "Bibliothèque", icon: "book", group: "Mes services", badge: "Nouveau" },

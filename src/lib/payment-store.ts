@@ -6,6 +6,7 @@ import { paymentWebhookEvents, requestPayments } from "@/db/payment-schema";
 import { requestEvents, serviceRequests } from "@/db/workspace-schema";
 import { requireStaff } from "@/lib/staff-auth";
 import type { CustomerIdentity } from "@/lib/customer-auth";
+import { activatePremiumPass } from "@/lib/premium-store";
 import { acceptedPaymentStatuses, paymentSchedule, type PaymentSummary, type PaymentState } from "@/lib/payment-policy";
 import { createGeniusPayCheckout, fetchGeniusPayTransaction, geniusPayConfigIssue, getGeniusPayConfig, isProviderReference, PaymentError, requireGeniusPayConfig, safeCheckoutUrl, verifyGeniusPayWebhook, type GeniusPayConfig, type GeniusPayTransaction } from "@/lib/geniuspay";
 
@@ -134,6 +135,8 @@ async function reconcilePayment(remote: GeniusPayTransaction, config: GeniusPayC
     }
     const now = new Date();
     await tx.update(requestPayments).set({ status, providerReference: remote.reference, paidAt: status === "completed" ? payment.paidAt ?? now : payment.paidAt, updatedAt: now }).where(eq(requestPayments.id, id));
+    // A confirmed Premium pass payment activates 30 days of Premium in the same transaction.
+    if (status === "completed" && payment.status !== "completed") await activatePremiumPass(tx, payment.requestId, payment.environment as "live" | "sandbox", now);
     if (status !== payment.status && ["completed", "refunded", "review_required"].includes(status)) {
       const prefix = payment.environment === "sandbox" ? "TEST SANDBOX — aucun encaissement réel. " : "";
       await tx.insert(requestEvents).values({ requestId: payment.requestId, type: status === "completed" ? "payment_confirmed" : status === "refunded" ? "payment_refunded" : "payment_review_required", actorName: "GeniusPay",

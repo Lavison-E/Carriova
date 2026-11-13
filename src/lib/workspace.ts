@@ -40,6 +40,7 @@ export function workspaceStatusLabel(status: string) {
   return workspaceStatusOptions.find((option) => option.value === status)?.label ?? status;
 }
 export function workspaceServiceLabel(service: string) {
+  if (service === "premium_pass") return "Pass Premium · 30 jours";
   return workspaceServiceOptions.find((option) => option.value === service)?.label ?? service;
 }
 export type WorkspaceRequestSummary = {

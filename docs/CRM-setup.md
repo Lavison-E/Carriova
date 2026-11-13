@@ -128,3 +128,10 @@ Chaque invitation et chaque rattachement est inscrit dans l’historique du suiv
 ## Ebook « Employable & Indispensable »
 
 Le produit est décrit dans `src/lib/ebook.ts` (prix, contenus, lien Chariow) : modifiez ce fichier pour mettre à jour toutes les pages. Il apparaît sur `/ebook/employable-indispensable`, sur l’accueil, dans les ressources, l’en-tête et le pied de page, dans l’espace client (`/espace` et `/espace/bibliotheque`) et dans les réponses rapides de l’équipe. Le paiement et la livraison du PDF se font sur Chariow ; les liens portent `utm_source=carriova` et `utm_medium` = `site`, `espace` ou `equipe` pour suivre l’origine des ventes.
+
+## Premium (2 000 FCFA / 30 jours)
+
+- **Achat** : `/espace/premium` → « Activer Premium » crée une demande « Pass Premium · 30 jours » (service `premium_pass`, 2 000 FCFA) et ouvre son paiement GeniusPay. À la confirmation du paiement (retour client ou webhook), 30 jours de Premium sont ajoutés dans la même transaction ; un renouvellement anticipé s’ajoute aux jours restants. Aucun prélèvement automatique.
+- **Fonctions Premium** : offres du catalogue classées par score de compatibilité, analyse d’une annonce collée (score, mots-clés absents du profil, plan d’action), dossier de candidature généré par l’IA Groq (message au recruteur, lettre, ajustements du CV, questions d’entretien, relance J+7), suivi des candidatures (statuts, relances, notes) et plan de préparation sur 4 semaines selon le profil.
+- **IA** : utilise `GROQ_API_KEY` (comme le Studio CV), 15 générations par client et par 24 h. Seules les informations professionnelles du profil sont envoyées, jamais le nom, l’e-mail ou le téléphone. Sans clé, l’analyse et le plan « méthode CARRIOVA » restent disponibles.
+- **Base** : migration `20261113_premium.sql`, appliquée automatiquement par `npm run db:crm` au build.

@@ -65,7 +65,7 @@ test("GeniusPay checkout, verification and webhooks use a private PostgreSQL led
   let customer = { id: 1, name: "Awa", email: "awa@example.test" }; let staff = null;
   class CustomerUnauthorizedError extends Error {} class UnauthorizedError extends Error {}
   const provider = { ...genius, getGeniusPayConfig: () => activeConfig, requireGeniusPayConfig: () => { if (!activeConfig) throw new genius.PaymentError(503, "PAYMENTS_DISABLED", "Disabled"); return activeConfig; } };
-  const mocks = { "server-only": {}, "@/db": { getDb: () => { accesses++; return db; } }, "@/db/payment-schema": paymentSchema, "@/db/workspace-schema": workspace, "@/lib/payment-policy": policy, "@/lib/geniuspay": provider,
+  const mocks = { "server-only": {}, "@/lib/premium-store": { activatePremiumPass: async () => {} }, "@/db": { getDb: () => { accesses++; return db; } }, "@/db/payment-schema": paymentSchema, "@/db/workspace-schema": workspace, "@/lib/payment-policy": policy, "@/lib/geniuspay": provider,
     "@/lib/customer-auth": { CustomerUnauthorizedError, requireCustomer: async () => { if (!customer) throw new CustomerUnauthorizedError(); return customer; } },
     "@/lib/staff-auth": { UnauthorizedError, requireStaff: async () => { if (!staff) throw new UnauthorizedError(); return staff; } } };
   const store = loadTypeScript("src/lib/payment-store.ts", mocks); mocks["@/lib/payment-store"] = store;
