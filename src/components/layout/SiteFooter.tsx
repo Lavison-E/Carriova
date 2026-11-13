@@ -4,7 +4,7 @@ import { Logo } from "@/components/brand/Logo";
 import { NewsletterForm } from "@/components/forms/LeadForms";
 import { ButtonLink } from "@/components/ui/primitives";
 import { serverEnv } from "@/lib/env";
-import { footerGroups, whatsappChatUrl } from "@/lib/site";
+import { footerGroups, siteConfig, whatsappChatUrl } from "@/lib/site";
 
 export function SiteFooter() {
   const whatsappUrl = whatsappChatUrl();
@@ -39,9 +39,10 @@ export function SiteFooter() {
                 Échanger sur WhatsApp <span aria-hidden="true">↗</span>
               </a>
             ) : null}
-            <div className="mt-5 flex gap-6">
-              <a href="https://www.linkedin.com/company/carriova" className="inline-flex min-h-10 items-center gap-2 text-xs text-white/70 hover:text-white" rel="noopener noreferrer" target="_blank">LinkedIn <span aria-hidden="true">↗</span></a>
-              <a href="https://www.facebook.com/carriova" className="inline-flex min-h-10 items-center gap-2 text-xs text-white/70 hover:text-white" rel="noopener noreferrer" target="_blank">Facebook <span aria-hidden="true">↗</span></a>
+            <div className="mt-5 flex flex-wrap gap-x-6 gap-y-1">
+              {[["LinkedIn", siteConfig.social.linkedin], ["Facebook", siteConfig.social.facebook], ["TikTok", siteConfig.social.tiktok]].map(([label, href]) => (
+                <a key={label} href={href} className="inline-flex min-h-10 items-center gap-2 text-xs text-white/70 hover:text-white" rel="noopener noreferrer" target="_blank">{label} <span aria-hidden="true">↗</span></a>
+              ))}
             </div>
           </div>
 

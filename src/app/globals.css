@@ -73,13 +73,6 @@ button, summary { cursor: pointer; }
   background: #fff;
   box-shadow: 0 1px 2px rgb(0 18 82 / 0.04), 0 12px 32px rgb(0 18 82 / 0.05);
 }
-/* Ebook mockup: fade the artwork background into any dark surface. */
-.ebook-cover {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 9%, #000 91%, transparent), linear-gradient(to bottom, transparent, #000 7%, #000 90%, transparent);
-  -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(to right, transparent, #000 9%, #000 91%, transparent), linear-gradient(to bottom, transparent, #000 7%, #000 90%, transparent);
-  mask-composite: intersect;
-}
 summary { min-height: 1.5rem; }
 summary::-webkit-details-marker { display: none; }
 @media (min-width: 640px) { .site-container { padding-inline: 2rem; } }

@@ -73,7 +73,7 @@ export function organizationJsonLd() {
     slogan: siteConfig.tagline,
     email: serverEnv.CONTACT_EMAIL,
     areaServed: ["CI", "West Africa", "Africa"],
-    sameAs: [siteConfig.social.linkedin, siteConfig.social.facebook],
+    sameAs: [siteConfig.social.linkedin, siteConfig.social.facebook, siteConfig.social.tiktok],
     description: siteConfig.description,
   };
 }

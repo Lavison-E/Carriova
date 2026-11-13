@@ -57,8 +57,9 @@ export const siteConfig = {
   locale: "fr_CI",
   lang: "fr",
   social: {
-    linkedin: "https://www.linkedin.com/company/carriova",
-    facebook: "https://www.facebook.com/carriova",
+    linkedin: "https://www.linkedin.com/company/carriova/",
+    facebook: "https://www.facebook.com/profile.php?id=61594162888088",
+    tiktok: "https://www.tiktok.com/@carriova",
   },
   market: "Côte d'Ivoire",
 } as const;

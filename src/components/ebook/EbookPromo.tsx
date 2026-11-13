@@ -13,7 +13,7 @@ export function EbookGlow() {
 }
 
 export function EbookCover({ className = "", priority = false, sizes = "(min-width: 1024px) 420px, 70vw" }: { className?: string; priority?: boolean; sizes?: string }) {
-  return <Image src={ebook.cover} alt={`Couverture de l’ebook ${ebook.name}, par ${ebook.author}`} width={860} height={1130} priority={priority} sizes={sizes} className={`ebook-cover h-auto w-full ${className}`} />;
+  return <Image src={ebook.cover} alt={`Couverture de l’ebook ${ebook.name}, par ${ebook.author}`} width={674} height={976} priority={priority} sizes={sizes} className={`h-auto w-full drop-shadow-[0_32px_44px_rgba(0,8,40,0.45)] ${className}`} />;
 }
 
 export function EbookPrice({ tone = "dark" }: { tone?: "dark" | "light" }) {
