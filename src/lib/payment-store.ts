@@ -7,7 +7,7 @@ import { requestEvents, serviceRequests } from "@/db/workspace-schema";
 import { requireStaff } from "@/lib/staff-auth";
 import type { CustomerIdentity } from "@/lib/customer-auth";
 import { acceptedPaymentStatuses, paymentSchedule, type PaymentSummary, type PaymentState } from "@/lib/payment-policy";
-import { createGeniusPayCheckout, fetchGeniusPayTransaction, getGeniusPayConfig, isProviderReference, PaymentError, requireGeniusPayConfig, safeCheckoutUrl, verifyGeniusPayWebhook, type GeniusPayConfig, type GeniusPayTransaction } from "@/lib/geniuspay";
+import { createGeniusPayCheckout, fetchGeniusPayTransaction, geniusPayConfigIssue, getGeniusPayConfig, isProviderReference, PaymentError, requireGeniusPayConfig, safeCheckoutUrl, verifyGeniusPayWebhook, type GeniusPayConfig, type GeniusPayTransaction } from "@/lib/geniuspay";
 
 type Db = ReturnType<typeof getDb>;
 type Transaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -172,5 +172,5 @@ export async function getTeamRequestPaymentSummary(requestId: number): Promise<P
   await requireStaff();
   const db = getDb(); const [request] = await db.select().from(serviceRequests).where(eq(serviceRequests.id, requestId));
   if (!request) throw new PaymentError(404, "NOT_FOUND", "Demande introuvable.");
-  return summaryFor(db, request, getGeniusPayConfig());
+  return { ...(await summaryFor(db, request, getGeniusPayConfig())), configIssue: geniusPayConfigIssue() };
 }

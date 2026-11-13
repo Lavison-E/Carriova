@@ -14,5 +14,7 @@ export type PaymentSummary = {
   enabled: boolean; environment: "sandbox" | "live" | null; isTest: boolean; accepted: boolean;
   quoteAmount: number | null; paidAmount: number; remainingAmount: number; dueAmount: number;
   stage: PaymentStage | null; awaitingDelivery: boolean; needsReview: boolean;
+  /** Staff only: why online payment is disabled. */
+  configIssue?: string | null;
   payments: { id: string; amount: number; stage: PaymentStage; status: PaymentState; reference: string | null; checkoutUrl: string | null; createdAt: string; paidAt: string | null }[];
 };

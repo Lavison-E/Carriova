@@ -223,3 +223,17 @@ test("GeniusPay checkout, verification and webhooks use a private PostgreSQL led
     const response=http.paymentErrorResponse(new Error("postgresql://secret-password")); assert.equal(response.status,503); assert.doesNotMatch(await response.text(),/secret-password/);
   });
 });
+test("staff diagnostic names the blocking setting without exposing secrets", () => {
+  assert.equal(genius.geniusPayConfigIssue(fakeEnv), null);
+  assert.match(genius.geniusPayConfigIssue({ ...fakeEnv, GENIUSPAY_ENVIRONMENT: undefined }), /absente/);
+  assert.match(genius.geniusPayConfigIssue({ ...fakeEnv, GENIUSPAY_ENVIRONMENT: "live\n" }), /espaces/);
+  assert.match(genius.geniusPayConfigIssue({ ...fakeEnv, GENIUSPAY_ENVIRONMENT: "Live" }), /minuscules/);
+  assert.match(genius.geniusPayConfigIssue({ ...fakeEnv, VERCEL_ENV: "production" }), /sandbox/);
+  const live = { ...fakeEnv, GENIUSPAY_ENVIRONMENT: "live" };
+  assert.match(genius.geniusPayConfigIssue(live), /pk_live_/);
+  assert.match(genius.geniusPayConfigIssue({ ...live, GENIUSPAY_API_KEY: "pk_live_x" }), /sk_live_/);
+  assert.match(genius.geniusPayConfigIssue({ ...fakeEnv, GENIUSPAY_WEBHOOK_SECRET: "abc" }), /whsec_/);
+  assert.match(genius.geniusPayConfigIssue({ ...fakeEnv, NEXT_PUBLIC_SITE_URL: "https://www.carriovaci.com/fr" }), /NEXT_PUBLIC_SITE_URL/);
+  for (const value of [fakeEnv.GENIUSPAY_API_KEY, fakeEnv.GENIUSPAY_API_SECRET, fakeEnv.GENIUSPAY_WEBHOOK_SECRET])
+    assert.ok(!genius.geniusPayConfigIssue({ ...fakeEnv, GENIUSPAY_ENVIRONMENT: "live" }).includes(value));
+});

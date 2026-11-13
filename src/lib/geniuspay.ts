@@ -20,6 +20,24 @@ export function getGeniusPayConfig(env: NodeJS.ProcessEnv = process.env): Genius
     return { environment, apiKey, apiSecret, webhookSecret, siteUrl: site.origin };
   } catch { return null; }
 }
+/** Why payments are disabled, for staff only. Never returns or logs a secret value. */
+export function geniusPayConfigIssue(env: NodeJS.ProcessEnv = process.env): string | null {
+  if (getGeniusPayConfig(env)) return null;
+  const raw = env.GENIUSPAY_ENVIRONMENT;
+  const environment = raw?.trim();
+  if (!environment) return "GENIUSPAY_ENVIRONMENT est absente : indiquez « live » en production.";
+  if (raw !== environment) return "GENIUSPAY_ENVIRONMENT contient des espaces ou un retour à la ligne : saisissez exactement « live ».";
+  if (environment !== "sandbox" && environment !== "live") return "GENIUSPAY_ENVIRONMENT doit valoir exactement « live » ou « sandbox » (en minuscules).";
+  if (env.VERCEL_ENV === "production" && environment === "sandbox") return "GENIUSPAY_ENVIRONMENT vaut « sandbox » sur la production : le paiement de test est volontairement bloqué. Passez-la à « live » avec les clés live.";
+  const apiKey = env.GENIUSPAY_API_KEY?.trim(), apiSecret = env.GENIUSPAY_API_SECRET?.trim(), webhookSecret = env.GENIUSPAY_WEBHOOK_SECRET?.trim();
+  if (!apiKey) return "GENIUSPAY_API_KEY est absente de cet environnement Vercel.";
+  if (!apiSecret) return "GENIUSPAY_API_SECRET est absente de cet environnement Vercel.";
+  if (!webhookSecret) return "GENIUSPAY_WEBHOOK_SECRET est absente de cet environnement Vercel.";
+  if (!apiKey.startsWith(`pk_${environment}_`)) return `GENIUSPAY_API_KEY ne commence pas par « pk_${environment}_ » : vérifiez qu’il s’agit de la clé publique ${environment}.`;
+  if (!apiSecret.startsWith(`sk_${environment}_`)) return `GENIUSPAY_API_SECRET ne commence pas par « sk_${environment}_ » : vérifiez qu’il s’agit de la clé secrète ${environment}.`;
+  if (!webhookSecret.startsWith("whsec_")) return "GENIUSPAY_WEBHOOK_SECRET ne commence pas par « whsec_ » : copiez le secret de signature du webhook GeniusPay.";
+  return "NEXT_PUBLIC_SITE_URL doit être exactement https://www.carriovaci.com (https, sans chemin, sans paramètre).";
+}
 export function requireGeniusPayConfig(): GeniusPayConfig {
   const config = getGeniusPayConfig();
   if (!config) throw new PaymentError(503, "PAYMENTS_DISABLED", "Le paiement en ligne n’est pas encore disponible. Contactez l’équipe depuis votre demande.");
