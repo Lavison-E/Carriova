@@ -1,4 +1,5 @@
 "use client";
+import { MultiFileUpload } from "@/components/workspace/MultiFileUpload";
 
 import Link from "next/link";
 import { OfferChoice } from "@/components/forms/OfferChoice";
@@ -65,14 +66,11 @@ export function MessageForm({ requestId }: { requestId: number }) {
 }
 
 export function UploadForm({ requestId, fileCount }: { requestId: number; fileCount: number }) {
-  const submission = useSubmission(uploadRequestFile);
-  const { state, action, pending, revision } = submission;
   if (fileCount >= WORKSPACE_MAX_FILES) return <p className="mt-5 rounded-lg bg-paper p-4 text-xs leading-6 text-muted">Cette demande a atteint sa limite de {WORKSPACE_MAX_FILES} documents de travail. Écrivez à l’équipe si vous devez transmettre un complément.</p>;
-  return <div className="mt-6 border-t border-line pt-6"><Feedback submission={submission} /><form key={revision} action={action} onReset={(event) => event.preventDefault()} aria-busy={pending}>
-    <input type="hidden" name="requestId" value={requestId} /><input type="hidden" name="context" value="customer" /><input type="hidden" name="kind" value="brief" />
-    <fieldset disabled={pending} className="min-w-0"><Field name="file" label="Ajouter un document" error={state.fieldErrors?.file} hint="PDF, Word (.docx), JPG ou PNG · 3 Mo maximum par fichier. Les documents restent privés dans votre espace.">{(props) => <input {...props} type="file" required accept={WORKSPACE_FILE_ACCEPT} onChange={(event) => event.currentTarget.setCustomValidity((event.currentTarget.files?.[0]?.size ?? 0) > WORKSPACE_MAX_FILE_BYTES ? "Ce fichier dépasse 3 Mo. Choisissez un fichier plus léger." : "")} className="mt-3 block w-full min-w-0 rounded-lg border border-dashed border-line bg-paper p-3 text-[11px] leading-6 text-muted file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:text-[11px] file:font-semibold file:text-night" />}</Field></fieldset>
-    <button type="submit" disabled={pending} className="mt-4 inline-flex min-h-11 items-center gap-5 rounded-lg bg-night px-4 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60">{pending ? "Dépôt en cours…" : "Déposer le document"}<CareerIcon name="arrow" className="h-3.5 w-3.5" /></button>
-  </form></div>;
+  return <div className="mt-6 border-t border-line pt-6">
+    <MultiFileUpload fields={{ context: "customer", requestId, kind: "brief" }} remaining={WORKSPACE_MAX_FILES - fileCount} label="Ajouter des documents" buttonLabel="Déposer" tone="paper" />
+    <p className="mt-3 text-[10px] leading-5 text-muted">Les documents restent privés dans votre espace et ne sont visibles que par l’équipe CARRIOVA.</p>
+  </div>;
 }
 
 export function CustomerDecisionForm({ request }: { request: WorkspaceRequestSummary }) {

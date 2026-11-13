@@ -2,13 +2,14 @@
 
 import { useActionState, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { CareerIcon } from "@/components/brand/CareerIcon";
+import { MultiFileUpload } from "@/components/workspace/MultiFileUpload";
 import { FileList, RequestStatusBadge, formatWorkspaceDate } from "@/components/workspace/WorkspaceUi";
 import type { ActionState } from "@/lib/actions";
 import type { CrmInvitationState, CrmLeadWorkspace } from "@/lib/crm";
 import { ebook, ebookCheckoutHref } from "@/lib/ebook";
 import { createCrmLeadInvitation, linkCrmLeadToCustomer } from "@/lib/crm-workspace-actions";
-import { addRequestMessage, uploadRequestFile } from "@/lib/workspace-actions";
-import { WORKSPACE_FILE_ACCEPT, WORKSPACE_MAX_FILE_BYTES, WORKSPACE_MAX_FILES } from "@/lib/workspace";
+import { addRequestMessage } from "@/lib/workspace-actions";
+import { WORKSPACE_MAX_FILES } from "@/lib/workspace";
 
 type LinkedRequest = NonNullable<CrmLeadWorkspace["request"]>;
 const initialState: ActionState = { ok: false, message: "" };
@@ -98,35 +99,11 @@ function Conversation({ request }: { request: LinkedRequest }) {
 }
 
 function Documents({ request, count }: { request: LinkedRequest; count: number }) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [chosen, setChosen] = useState("");
-  const [localError, setLocalError] = useState("");
-  const [state, action, pending] = useActionState(async (previous: ActionState, data: FormData) => {
-    const result = await uploadRequestFile(previous, data);
-    if (result.ok) { if (fileRef.current) fileRef.current.value = ""; setChosen(""); }
-    return result;
-  }, initialState);
   const closed = request.status === "completed" || request.status === "cancelled";
-  const full = count >= WORKSPACE_MAX_FILES;
-  function check(event: FormEvent<HTMLFormElement>) {
-    const file = fileRef.current?.files?.[0];
-    if (file && file.size > WORKSPACE_MAX_FILE_BYTES) { event.preventDefault(); setLocalError("Ce fichier dépasse 3 Mo. Choisissez une version plus légère."); }
-    else setLocalError("");
-  }
   return <div className="space-y-6">
-    {closed || full ? <p className="rounded-lg bg-paper px-4 py-3 text-xs leading-6 text-muted">{closed ? "La commande est clôturée : les documents existants restent disponibles." : "La limite de 12 documents partagés est atteinte pour cette commande."}</p> : <form action={action} onSubmit={check} onReset={(event) => event.preventDefault()} aria-busy={pending} className="space-y-3">
-      <input type="hidden" name="context" value="team" /><input type="hidden" name="requestId" value={request.id} /><input type="hidden" name="kind" value="brief" />
-      <Feedback state={state} />
-      <label className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-5 py-7 text-center transition-colors ${chosen ? "border-night bg-paper" : "border-line hover:border-night hover:bg-paper"}`}>
-        <CareerIcon name="document" className="h-6 w-6 text-night" />
-        <span className="break-all text-sm font-semibold text-night">{chosen || "Choisir un document à envoyer"}</span>
-        <span className="text-[11px] leading-5 text-muted">PDF, DOCX, JPG ou PNG · 3 Mo maximum · {count} / {WORKSPACE_MAX_FILES} documents partagés</span>
-        <input ref={fileRef} name="file" type="file" required accept={WORKSPACE_FILE_ACCEPT} disabled={pending} onChange={(event) => { setLocalError(""); setChosen(event.target.files?.[0]?.name ?? ""); }} aria-invalid={localError || state.fieldErrors?.file ? true : undefined} aria-describedby="crm-file-error" className="sr-only" />
-      </label>
-      <p id="crm-file-error" role={localError ? "alert" : undefined} className="text-xs leading-5 text-orange">{localError || state.fieldErrors?.file}</p>
-      <button type="submit" disabled={pending || !chosen} className="inline-flex min-h-12 w-full items-center justify-between gap-4 rounded-lg bg-night px-5 text-sm font-semibold text-white hover:bg-royal disabled:cursor-not-allowed disabled:opacity-60">{pending ? "Envoi du document…" : "Partager avec le client"}<CareerIcon name="document" className="h-4 w-4 shrink-0" /></button>
-      <p className="text-[11px] leading-5 text-muted">Le document est immédiatement visible dans l’espace du client. Pour une version à faire valider ou une livraison finale, passez par la commande complète.</p>
-    </form>}
+    {closed ? <p className="rounded-lg bg-paper px-4 py-3 text-xs leading-6 text-muted">La commande est clôturée : les documents existants restent disponibles.</p>
+      : count >= WORKSPACE_MAX_FILES ? <p className="rounded-lg bg-paper px-4 py-3 text-xs leading-6 text-muted">La limite de 12 documents partagés est atteinte pour cette commande.</p>
+      : <div className="space-y-2"><MultiFileUpload fields={{ context: "team", requestId: request.id, kind: "brief" }} remaining={WORKSPACE_MAX_FILES - count} label="Documents à partager avec le client" buttonLabel="Partager avec le client" /><p className="text-[11px] leading-5 text-muted">Les documents sont immédiatement visibles dans l’espace du client. Pour une version à faire valider ou une livraison finale, passez par la commande complète.</p></div>}
     <div><h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted">Documents visibles par le client</h3><FileList files={[...request.files].reverse()} context="team" emptyText="Aucun document partagé pour le moment." /></div>
   </div>;
 }

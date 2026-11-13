@@ -2,6 +2,7 @@
 
 import { createContext, useActionState, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { CareerIcon } from "@/components/brand/CareerIcon";
+import { MultiFileUpload } from "@/components/workspace/MultiFileUpload";
 import { formatWorkspaceDate } from "@/components/workspace/WorkspaceUi";
 import type { ActionState } from "@/lib/actions";
 import { addRequestMessage, publishRequestDelivery, publishRequestReview, removeDraftDelivery, removeDraftReview, sendRequestProposal, updateServiceRequest, uploadRequestFile } from "@/lib/workspace-actions";
@@ -178,41 +179,11 @@ function OrderDelivery({ request }: { request: ManagedRequest }) {
 
 function OrderFileUpload({ requestId, version, kind, count, closed = false }: { requestId: number; version: number; kind: "brief" | "review" | "delivery"; count: number; closed?: boolean }) {
   const mutation = useOrderMutation();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [localError, setLocalError] = useState("");
-  const [state, action, pending] = useActionState(async (previous: ActionState, data: FormData) => {
-    mutation.start();
-    try {
-      const result = await uploadRequestFile(previous, data);
-      if (result.ok) {
-        if (fileRef.current) fileRef.current.value = "";
-        if (kind !== "brief") mutation.committed(Number(data.get("version")), result);
-      }
-      return result;
-    } finally { mutation.finish(); }
-  }, initialState);
-  const full = count >= WORKSPACE_MAX_FILES;
-  const prefix = `order-${kind}-file`;
-  function checkFile(event: FormEvent<HTMLFormElement>) {
-    const file = fileRef.current?.files?.[0];
-    if (file && file.size > WORKSPACE_MAX_FILE_BYTES) {
-      event.preventDefault();
-      setLocalError("Ce fichier dépasse 3 Mo. Choisissez une version plus légère.");
-      fileRef.current?.focus();
-    } else setLocalError("");
-  }
-  return <div className="space-y-4">
-    {kind === "brief" || !state.ok ? <Feedback state={state} /> : null}
-    {closed || full ? <p className="rounded-lg bg-paper px-4 py-3 text-xs leading-6 text-muted">{closed ? "La commande est clôturée. Les documents déjà déposés restent disponibles." : kind !== "brief" ? "Les 12 emplacements de produits sont utilisés. Vous pouvez retirer un fichier en préparation pour en joindre un autre. Les produits déjà publiés restent conservés." : "La limite de 12 documents de travail est atteinte. Les emplacements des produits à livrer restent indépendants."}</p> : <form action={action} onSubmit={checkFile} onReset={(event) => event.preventDefault()} aria-busy={pending} className="space-y-4">
-      <input type="hidden" name="context" value="team" /><input type="hidden" name="requestId" value={requestId} /><input type="hidden" name="kind" value={kind} /><input type="hidden" name="version" value={version} />
-      <fieldset disabled={mutation.busy || pending} className="min-w-0 space-y-3">
-        <label className="block text-xs font-semibold">{kind !== "brief" ? "Fichier du produit" : "Document de travail"}<input ref={fileRef} name="file" type="file" required accept={WORKSPACE_FILE_ACCEPT} onChange={() => setLocalError("")} aria-invalid={localError || state.fieldErrors?.file ? true : undefined} aria-describedby={`${prefix}-help ${prefix}-error`} className="mt-3 block w-full min-w-0 rounded-lg border border-line p-2 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-paper file:px-3 file:py-3 file:text-xs file:font-semibold file:text-night" /></label>
-        <p id={`${prefix}-help`} className="text-[11px] leading-6 text-muted">PDF, DOCX, JPG ou PNG · 3 Mo maximum par fichier.<br />{count} / {WORKSPACE_MAX_FILES} {kind !== "brief" ? "produits joints, préparés et publiés" : "documents de travail"}.</p>
-        <p id={`${prefix}-error`} role={localError ? "alert" : undefined} className="text-xs leading-5 text-orange">{localError || state.fieldErrors?.file}</p>
-      </fieldset>
-      <button type="submit" disabled={mutation.busy || pending} className="inline-flex min-h-12 w-full items-center justify-between gap-4 rounded-lg bg-night px-5 py-3 text-left text-sm font-semibold text-white hover:bg-royal disabled:cursor-not-allowed disabled:opacity-60">{pending ? "Dépôt en cours…" : kind !== "brief" ? "Joindre à la préparation" : "Ajouter au dossier"}<CareerIcon name="document" className="h-4 w-4 shrink-0" /></button>
-    </form>}
-  </div>;
+  if (closed || count >= WORKSPACE_MAX_FILES) return <p className="rounded-lg bg-paper px-4 py-3 text-xs leading-6 text-muted">{closed ? "La commande est clôturée. Les documents déjà déposés restent disponibles." : kind !== "brief" ? "Les 12 emplacements de produits sont utilisés. Vous pouvez retirer un fichier en préparation pour en joindre un autre. Les produits déjà publiés restent conservés." : "La limite de 12 documents de travail est atteinte. Les emplacements des produits à livrer restent indépendants."}</p>;
+  return <MultiFileUpload fields={{ context: "team", requestId, kind }} version={kind !== "brief" ? version : undefined} remaining={WORKSPACE_MAX_FILES - count}
+    label={kind !== "brief" ? "Fichiers du produit" : "Documents de travail"} buttonLabel={kind !== "brief" ? "Joindre à la préparation" : "Ajouter au dossier"}
+    disabled={mutation.busy} tone="paper" onStart={mutation.start} onFinish={mutation.finish}
+    onFileUploaded={(used, result) => { if (kind !== "brief" && used !== undefined) mutation.committed(used, result); }} />;
 }
 
 export function DraftDeliveryRemoveButton({ requestId, fileId, version, filename, kind = "delivery" }: { requestId: number; fileId: number; version: number; filename: string; kind?: "review" | "delivery" }) {
